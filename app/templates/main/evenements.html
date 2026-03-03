@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Événements — UnivDZ{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div style="display:grid; grid-template-columns:280px 1fr; gap:2rem; padding:2rem 0; align-items:start;">
+    <aside>
+      <div class="card" style="position:sticky; top:80px;">
+        <div class="card-header"><strong>🔽 Filtres</strong></div>
+        <div class="card-body">
+          <form action="{{ url_for('main.evenements') }}" method="get">
+            <div class="form-group">
+              <label class="form-label">Recherche</label>
+              <input type="text" name="q" class="form-control" value="{{ current_filters.q }}" placeholder="Titre, université...">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Type</label>
+              <select name="type" class="form-control" onchange="this.form.submit()">
+                <option value="">Tous</option>
+                {% for t in event_types %}
+                <option value="{{ t }}" {% if current_filters.type == t %}selected{% endif %}>{{ t|replace('_',' ')|title }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Wilaya</label>
+              <select name="wilaya" class="form-control" onchange="this.form.submit()">
+                <option value="">Toutes</option>
+                {% for w in wilayas %}
+                <option value="{{ w }}" {% if current_filters.wilaya == w %}selected{% endif %}>{{ w }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Discipline</label>
+              <select name="discipline" class="form-control" onchange="this.form.submit()">
+                <option value="">Toutes</option>
+                {% for d in disciplines %}
+                <option value="{{ d }}" {% if current_filters.discipline == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">À partir du</label>
+              <input type="date" name="date_debut" class="form-control" value="{{ current_filters.date_debut }}">
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Appliquer</button>
+            {% if current_filters.q or current_filters.type or current_filters.wilaya or current_filters.discipline %}
+            <a href="{{ url_for('main.evenements') }}" class="btn btn-secondary" style="width:100%; margin-top:.5rem; text-align:center; justify-content:center;">Réinitialiser</a>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </aside>
+
+    <div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+        <h1 style="font-family:'Playfair Display',serif; font-size:1.6rem;">Événements</h1>
+        <span class="text-muted text-small">{{ pagination.total }} résultat(s)</span>
+      </div>
+
+      {% if events %}
+      <div style="display:flex; flex-direction:column; gap:1rem;">
+        {% for event in events %}
+        <div class="card">
+          <div class="card-body" style="display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:start;">
+            <div>
+              <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.5rem;">
+                <span class="badge badge-{{ event.type }}">{{ event.type|replace('_',' ') }}</span>
+                {% if event.discipline and event.discipline != 'Autre' %}
+                <span class="badge" style="background:#f3f4f6; color:#374151;">{{ event.discipline }}</span>
+                {% endif %}
+              </div>
+              <h2 style="font-size:1rem; font-weight:600; margin-bottom:.4rem; line-height:1.5;">
+                <a href="{{ url_for('main.detail', slug=event.slug) }}" style="color:var(--dark);">{{ event.titre[:150] }}</a>
+              </h2>
+              <p class="text-small text-muted">
+                {% if event.universite %}🏛 {{ event.universite[:60] }}{% endif %}
+                {% if event.wilaya %} · 📍 {{ event.wilaya }}{% endif %}
+              </p>
+            </div>
+            <div style="text-align:right; white-space:nowrap; min-width:110px;">
+              {% if event.date_debut %}<p class="text-small" style="font-weight:600; color:var(--green);">{{ event.date_debut.strftime('%d/%m/%Y') }}</p>{% endif %}
+              {% if event.date_limite %}<p class="text-small" style="color:#92400e;">⏰ {{ event.date_limite.strftime('%d/%m') }}</p>{% endif %}
+              <a href="{{ url_for('main.detail', slug=event.slug) }}" class="btn btn-secondary btn-sm" style="margin-top:.5rem;">Détails</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if pagination.pages > 1 %}
+      <div class="pagination">
+        {% if pagination.has_prev %}<a href="{{ url_for('main.evenements', page=pagination.prev_num, **current_filters) }}">‹ Prec</a>{% endif %}
+        {% for p in pagination.iter_pages() %}
+          {% if p %}
+            {% if p == pagination.page %}<span class="active">{{ p }}</span>
+            {% else %}<a href="{{ url_for('main.evenements', page=p, **current_filters) }}">{{ p }}</a>{% endif %}
+          {% else %}<span>…</span>{% endif %}
+        {% endfor %}
+        {% if pagination.has_next %}<a href="{{ url_for('main.evenements', page=pagination.next_num, **current_filters) }}">Suiv ›</a>{% endif %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div style="text-align:center; padding:4rem; color:var(--muted);">
+        <p style="font-size:3rem; margin-bottom:1rem;">🔍</p>
+        <p>Aucun événement ne correspond à vos critères.</p>
+        <a href="{{ url_for('main.evenements') }}" class="btn btn-secondary" style="margin-top:1rem;">Voir tous les événements</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

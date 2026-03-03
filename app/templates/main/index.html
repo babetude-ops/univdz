@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}UnivDZ — Manifestations Universitaires Algérie{% endblock %}
+
+{% block content %}
+<section style="background: linear-gradient(135deg, #1a6b3c 0%, #0f4225 100%); color:white; padding: 4rem 0 3rem;">
+  <div class="container" style="text-align:center;">
+    <h1 style="font-family:'Playfair Display',serif; font-size:clamp(2rem,5vw,3.2rem); margin-bottom:1rem; line-height:1.2;">
+      Toutes les manifestations universitaires<br><span style="color:#c9a84c;">algériennes en un clic</span>
+    </h1>
+    <p style="font-size:1.1rem; opacity:.85; max-width:600px; margin:0 auto 2rem;">
+      Colloques, séminaires, journées d'étude, appels à communication et bourses — collectés automatiquement depuis les universités d'Algérie.
+    </p>
+    <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <a href="{{ url_for('main.evenements') }}" class="btn btn-primary" style="font-size:1rem; padding:.7rem 1.8rem;">Voir tous les événements</a>
+      <a href="{{ url_for('main.bourses') }}" class="btn btn-secondary" style="font-size:1rem; padding:.7rem 1.8rem;">💰 Bourses en cours</a>
+    </div>
+    <div style="display:flex; gap:3rem; justify-content:center; margin-top:2.5rem; flex-wrap:wrap;">
+      <div><span style="font-size:2rem; font-weight:900; color:#c9a84c;">{{ stats.total }}</span><br><small style="opacity:.7;">événements</small></div>
+      <div><span style="font-size:2rem; font-weight:900; color:#c9a84c;">{{ stats.bourses }}</span><br><small style="opacity:.7;">bourses actives</small></div>
+      <div><span style="font-size:2rem; font-weight:900; color:#c9a84c;">{{ stats.colloques }}</span><br><small style="opacity:.7;">colloques</small></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:white; border-bottom:1px solid #e5e7eb; padding:1.5rem 0;">
+  <div class="container">
+    <form action="{{ url_for('main.evenements') }}" method="get" style="display:flex; gap:.75rem; flex-wrap:wrap; align-items:flex-end;">
+      <div style="flex:1; min-width:200px;">
+        <label class="form-label">Recherche</label>
+        <input type="text" name="q" class="form-control" placeholder="Titre, université...">
+      </div>
+      <div style="width:160px;">
+        <label class="form-label">Type</label>
+        <select name="type" class="form-control">
+          <option value="">Tous</option>
+          {% for t in event_types %}
+          <option value="{{ t }}">{{ t|replace('_', ' ')|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="width:180px;">
+        <label class="form-label">Wilaya</label>
+        <select name="wilaya" class="form-control">
+          <option value="">Toutes</option>
+          {% for w in wilayas %}
+          <option value="{{ w }}">{{ w }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary">🔍 Chercher</button>
+    </form>
+  </div>
+</section>
+
+<div class="container" style="padding-top:3rem;">
+  <h2 class="section-title">Prochains événements</h2>
+  {% if upcoming %}
+  <div class="grid-2 mb-3">
+    {% for event in upcoming %}
+    <a href="{{ url_for('main.detail', slug=event.slug) }}" style="text-decoration:none; color:inherit;">
+      <div class="card">
+        <div class="card-body">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; margin-bottom:.75rem;">
+            <span class="badge badge-{{ event.type }}">{{ event.type|replace('_',' ') }}</span>
+            {% if event.date_debut %}<span class="text-small text-muted">{{ event.date_debut.strftime('%d/%m/%Y') }}</span>{% endif %}
+          </div>
+          <h3 style="font-size:1rem; font-weight:600; margin-bottom:.5rem; line-height:1.4;">{{ event.titre[:100] }}</h3>
+          <p class="text-small text-muted">
+            {% if event.universite %}🏛 {{ event.universite[:50] }}{% endif %}
+            {% if event.wilaya %} · 📍 {{ event.wilaya }}{% endif %}
+          </p>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted mb-3">Aucun événement disponible pour le moment.</p>
+  {% endif %}
+  <div style="text-align:center; margin-bottom:3rem;">
+    <a href="{{ url_for('main.evenements') }}" class="btn btn-secondary">Voir tous les événements →</a>
+  </div>
+
+  {% if bourses %}
+  <h2 class="section-title" style="color:#92400e;">🎓 Bourses en cours</h2>
+  <div class="grid-2 mb-3">
+    {% for b in bourses %}
+    <a href="{{ url_for('main.detail', slug=b.slug) }}" style="text-decoration:none; color:inherit;">
+      <div class="card" style="border-left:4px solid #c9a84c;">
+        <div class="card-body">
+          <span class="badge badge-bourse" style="margin-bottom:.6rem;">Bourse</span>
+          <h3 style="font-size:1rem; font-weight:600; margin-bottom:.5rem;">{{ b.titre[:100] }}</h3>
+          {% if b.date_limite %}
+          <p class="text-small" style="color:#92400e; font-weight:600;">⏰ Limite : {{ b.date_limite.strftime('%d/%m/%Y') }}</p>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  <div style="text-align:center; margin-bottom:3rem;">
+    <a href="{{ url_for('main.bourses') }}" class="btn btn-secondary">Voir toutes les bourses →</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

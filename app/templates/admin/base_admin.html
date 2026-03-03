@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin — UnivDZ{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --green:#1a6b3c; --border:#e5e7eb; --bg:#f9fafb; --dark:#111827; --muted:#6b7280; }
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'IBM Plex Sans',sans-serif; background:var(--bg); color:var(--dark); }
+    .admin-layout { display:grid; grid-template-columns:240px 1fr; min-height:100vh; }
+    .sidebar { background:var(--green); color:white; padding:1.5rem 0; }
+    .sidebar-brand { font-size:1.3rem; font-weight:700; padding:0 1.25rem 1.5rem; border-bottom:1px solid rgba(255,255,255,.15); }
+    .sidebar-nav { list-style:none; margin-top:1rem; }
+    .sidebar-nav li a { display:flex; align-items:center; gap:.6rem; padding:.65rem 1.25rem; color:rgba(255,255,255,.8); font-size:.875rem; text-decoration:none; }
+    .sidebar-nav li a:hover, .sidebar-nav li a.active { background:rgba(255,255,255,.15); color:white; }
+    .main { padding:2rem; }
+    .page-title { font-size:1.5rem; font-weight:700; margin-bottom:1.5rem; }
+    .card { background:white; border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+    .card-body { padding:1.25rem; }
+    .card-header { padding:1rem 1.25rem; border-bottom:1px solid var(--border); font-weight:600; }
+    .btn { display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1rem; border-radius:6px; font-size:.875rem; font-weight:500; cursor:pointer; border:none; text-decoration:none; }
+    .btn-success { background:#059669; color:white; }
+    .btn-danger { background:#dc2626; color:white; }
+    .btn-primary { background:var(--green); color:white; }
+    .btn-secondary { background:white; color:var(--dark); border:1px solid var(--border); }
+    .btn-sm { padding:.3rem .7rem; font-size:.8rem; }
+    .badge { display:inline-flex; padding:.2rem .55rem; border-radius:999px; font-size:.7rem; font-weight:600; text-transform:uppercase; }
+    .badge-warn { background:#fef3c7; color:#92400e; }
+    .badge-success { background:#d1fae5; color:#065f46; }
+    table { width:100%; border-collapse:collapse; font-size:.875rem; }
+    th { text-align:left; padding:.6rem 1rem; background:var(--bg); color:var(--muted); font-weight:600; font-size:.8rem; text-transform:uppercase; border-bottom:1px solid var(--border); }
+    td { padding:.7rem 1rem; border-bottom:1px solid var(--border); vertical-align:top; }
+    .flash { padding:.75rem 1.25rem; border-radius:6px; margin-bottom:1rem; font-size:.875rem; }
+    .flash-success { background:#d1fae5; color:#065f46; }
+    .flash-warning { background:#fef3c7; color:#92400e; }
+    .flash-danger { background:#fee2e2; color:#991b1b; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <nav class="sidebar">
+    <div class="sidebar-brand">⚙️ UnivDZ Admin</div>
+    <ul class="sidebar-nav">
+      <li><a href="{{ url_for('admin.dashboard') }}" {% if request.endpoint=='admin.dashboard' %}class="active"{% endif %}>📊 Tableau de bord</a></li>
+      <li><a href="{{ url_for('admin.queue') }}" {% if request.endpoint=='admin.queue' %}class="active"{% endif %}>📥 File de validation</a></li>
+      <li><a href="{{ url_for('main.index') }}" target="_blank">🌐 Voir le site</a></li>
+      <li><a href="{{ url_for('admin.logout') }}" style="color:#fca5a5;">🚪 Déconnexion</a></li>
+    </ul>
+  </nav>
+  <main class="main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}{% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}{% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

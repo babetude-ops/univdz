@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}{{ revue.nom[:70] }} — UnivDZ{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 2.5rem 0;">
+  <a href="{{ url_for('main.revues') }}" class="text-muted text-small">← Retour aux revues</a>
+
+  <div style="display:grid; grid-template-columns:1fr 320px; gap:2rem; margin-top:1.5rem; align-items:start;">
+    <div>
+      <div class="card">
+        <div class="card-body" style="padding:2rem;">
+          <span style="display:inline-flex; padding:.3rem .8rem; border-radius:999px; font-size:.8rem; font-weight:600; background:#dcfce7; color:#166534; margin-bottom:1rem;">
+            🟢 Appel à soumission ouvert
+          </span>
+          <h1 style="font-family:'Playfair Display',serif; font-size:clamp(1.4rem,3vw,2rem); line-height:1.3; margin-bottom:.5rem;">
+            {{ revue.nom }}
+          </h1>
+          {% if revue.domaine %}
+          <p style="color:var(--green); font-weight:600; margin-bottom:1.5rem;">📂 {{ revue.domaine }}</p>
+          {% endif %}
+          {% if revue.description %}
+          <div style="line-height:1.8; color:var(--mid); font-size:.95rem;">{{ revue.description }}</div>
+          {% endif %}
+          {% if revue.lien_asjp %}
+          <div style="margin-top:2rem; padding:1.25rem; background:#eff6ff; border-radius:var(--radius); border:1px solid #bfdbfe;">
+            <p style="font-size:.85rem; color:#1d4ed8; font-weight:600; margin-bottom:.4rem;">🔗 Lien ASJP</p>
+            <a href="{{ revue.lien_asjp }}" target="_blank" style="font-size:.85rem; word-break:break-all; color:#1d4ed8;">
+              {{ revue.lien_asjp }}
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="position:sticky; top:80px;">
+        <div class="card-header"><strong>📋 Informations</strong></div>
+        <div class="card-body">
+          <table style="width:100%; font-size:.875rem; border-collapse:collapse;">
+            {% if revue.universite %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.6rem .25rem; color:var(--muted);">🏛 Institution</td>
+              <td style="padding:.6rem .25rem .6rem .75rem; font-weight:500;">{{ revue.universite }}</td>
+            </tr>
+            {% endif %}
+            {% if revue.domaine %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.6rem .25rem; color:var(--muted);">📂 Domaine</td>
+              <td style="padding:.6rem .25rem .6rem .75rem; font-weight:500;">{{ revue.domaine }}</td>
+            </tr>
+            {% endif %}
+            {% if revue.date_limite %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.6rem .25rem; color:var(--muted); white-space:nowrap;">⏰ Date limite</td>
+              <td style="padding:.6rem .25rem .6rem .75rem; font-weight:700; color:#d97706;">{{ revue.date_limite.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% endif %}
+            {% if revue.annee_volume %}
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:.6rem .25rem; color:var(--muted);">📅 Volume</td>
+              <td style="padding:.6rem .25rem .6rem .75rem; font-weight:500;">{{ revue.annee_volume }}</td>
+            </tr>
+            {% endif %}
+            <tr>
+              <td style="padding:.6rem .25rem; color:var(--muted);">📰 Source</td>
+              <td style="padding:.6rem .25rem .6rem .75rem; font-weight:500;">ASJP</td>
+            </tr>
+          </table>
+
+          {% if revue.lien_asjp %}
+          <a href="{{ revue.lien_asjp }}" target="_blank" class="btn btn-primary" style="width:100%; text-align:center; justify-content:center; margin-top:1rem;">
+            Soumettre sur ASJP ↗
+          </a>
+          {% endif %}
+
+          <div style="margin-top:1rem; padding:1rem; background:#fffbeb; border-radius:var(--radius); border:1px solid #fde68a;">
+            <p style="font-size:.8rem; color:#92400e;">⚠️ Vérifiez toujours les dates et conditions sur le site officiel ASJP avant de soumettre.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if similaires %}
+  <div style="margin-top:3rem;">
+    <h2 class="section-title">Revues similaires</h2>
+    <div class="grid-3">
+      {% for s in similaires %}
+      <a href="{{ url_for('main.detail_revue', slug=s.slug) }}" style="text-decoration:none; color:inherit;">
+        <div class="card">
+          <div class="card-body">
+            <span style="display:inline-flex; padding:.2rem .6rem; border-radius:999px; font-size:.7rem; font-weight:600; background:#dcfce7; color:#166534; margin-bottom:.5rem;">🟢 Ouvert</span>
+            <h3 style="font-size:.9rem; font-weight:600;">{{ s.nom[:80] }}</h3>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

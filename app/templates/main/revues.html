@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Revues scientifiques — UnivDZ{% endblock %}
+
+{% block content %}
+<div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f2027 100%); color:white; padding:3rem 0; text-align:center;">
+  <div class="container">
+    <h1 style="font-family:'Playfair Display',serif; font-size:2.2rem; margin-bottom:.75rem;">📚 Revues scientifiques algériennes</h1>
+    <p style="opacity:.85;">Revues ayant publié un appel à soumission sur <strong>ASJP</strong> — classées par domaine</p>
+    <p style="margin-top:.5rem; opacity:.7; font-size:.875rem;">{{ total }} revue(s) avec appel ouvert</p>
+  </div>
+</div>
+
+<div class="container" style="padding:2.5rem 0;">
+
+  <!-- FILTRES PAR DOMAINE -->
+  {% if tous_domaines %}
+  <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:2rem;">
+    <a href="{{ url_for('main.revues') }}"
+       style="padding:.4rem 1rem; border-radius:999px; font-size:.85rem; font-weight:500; text-decoration:none;
+              {% if not domaine_filtre %}background:var(--green); color:white;{% else %}background:#f3f4f6; color:#374151;{% endif %}">
+      Tous
+    </a>
+    {% for d in tous_domaines|sort %}
+    <a href="{{ url_for('main.revues', domaine=d) }}"
+       style="padding:.4rem 1rem; border-radius:999px; font-size:.85rem; font-weight:500; text-decoration:none;
+              {% if domaine_filtre == d %}background:var(--green); color:white;{% else %}background:#f3f4f6; color:#374151;{% endif %}">
+      {{ d }}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- REVUES PAR DOMAINE -->
+  {% if domaines %}
+    {% for domaine, liste in domaines.items()|sort %}
+    <div style="margin-bottom:3rem;">
+      <h2 style="font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--dark); margin-bottom:1rem; padding-bottom:.5rem; border-bottom:3px solid var(--green);">
+        📂 {{ domaine }} <span style="font-size:.9rem; color:var(--muted); font-family:'IBM Plex Sans',sans-serif;">({{ liste|length }})</span>
+      </h2>
+      <div class="grid-3">
+        {% for revue in liste %}
+        <a href="{{ url_for('main.detail_revue', slug=revue.slug) }}" style="text-decoration:none; color:inherit;">
+          <div class="card" style="border-top:3px solid var(--green);">
+            <div class="card-body">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:.5rem; margin-bottom:.6rem;">
+                <span style="display:inline-flex; padding:.2rem .6rem; border-radius:999px; font-size:.7rem; font-weight:600; background:#dcfce7; color:#166534; text-transform:uppercase;">
+                  🟢 Appel ouvert
+                </span>
+                {% if revue.date_limite %}
+                <span style="font-size:.75rem; color:#d97706; font-weight:600;">⏰ {{ revue.date_limite.strftime('%d/%m/%Y') }}</span>
+                {% endif %}
+              </div>
+              <h3 style="font-size:.95rem; font-weight:600; line-height:1.4; margin-bottom:.4rem;">{{ revue.nom[:80] }}</h3>
+              {% if revue.universite %}
+              <p style="font-size:.78rem; color:var(--muted);">🏛 {{ revue.universite[:60] }}</p>
+              {% endif %}
+              {% if revue.description %}
+              <p style="font-size:.78rem; color:var(--mid); margin-top:.4rem;">{{ revue.description[:100] }}...</p>
+              {% endif %}
+            </div>
+            <div class="card-footer" style="padding:.6rem 1.25rem; background:#f9fafb; border-top:1px solid #e5e7eb;">
+              <span style="font-size:.78rem; color:var(--green); font-weight:500;">Voir les détails →</span>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="text-align:center; padding:4rem; color:var(--muted);">
+    <p style="font-size:3rem; margin-bottom:1rem;">📭</p>
+    <p>Aucune revue disponible pour le moment.</p>
+    <p style="margin-top:.5rem; font-size:.875rem;">Le scraper ASJP collectera automatiquement les appels à soumission.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

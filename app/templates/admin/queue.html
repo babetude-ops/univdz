@@ -1,0 +1,39 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}File d'attente — Admin UnivDZ{% endblock %}
+{% block content %}
+<h1 class="page-title">📥 File de validation <span style="font-size:1rem; color:var(--muted);">({{ events.total }} événements)</span></h1>
+{% if events.items %}
+<div style="display:flex; flex-direction:column; gap:1rem;">
+  {% for event in events.items %}
+  <div class="card">
+    <div class="card-body" style="display:grid; grid-template-columns:1fr auto; gap:1rem; align-items:start;">
+      <div>
+        <div style="display:flex; gap:.5rem; margin-bottom:.5rem; flex-wrap:wrap; align-items:center;">
+          <span class="badge badge-warn">{{ event.type }}</span>
+          {% if event.wilaya %}<span class="badge" style="background:#e0f2fe; color:#075985;">{{ event.wilaya }}</span>{% endif %}
+          <span style="font-size:.75rem; color:var(--muted);">Score: {{ (event.score_fiabilite*100)|int }}%</span>
+        </div>
+        <h3 style="font-size:.95rem; font-weight:600; margin-bottom:.3rem;">{{ event.titre[:100] }}</h3>
+        <p style="font-size:.8rem; color:var(--muted);">{{ event.universite or '—' }} · {{ event.source or '—' }} · {{ event.date_collecte.strftime('%d/%m/%Y %H:%M') }}</p>
+        {% if event.description %}<p style="font-size:.8rem; color:#374151; margin-top:.35rem;">{{ event.description[:200] }}</p>{% endif %}
+        {% if event.lien_officiel %}<a href="{{ event.lien_officiel }}" target="_blank" style="font-size:.8rem;">🔗 {{ event.lien_officiel[:80] }}</a>{% endif %}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:.5rem;">
+        <form method="post" action="{{ url_for('admin.valider', event_id=event.id) }}"><button class="btn btn-success btn-sm" style="width:100%;">✓ Valider</button></form>
+        <form method="post" action="{{ url_for('admin.rejeter', event_id=event.id) }}"><button class="btn btn-danger btn-sm" style="width:100%;">✗ Rejeter</button></form>
+        <a href="{{ url_for('admin.editer', event_id=event.id) }}" class="btn btn-secondary btn-sm" style="text-align:center;">✎ Éditer</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="card-body" style="text-align:center; padding:3rem; color:var(--muted);">
+  <p style="font-size:3rem; margin-bottom:1rem;">✅</p>
+  <p>Aucun événement en attente.</p>
+  <form action="{{ url_for('admin.lancer_scraper') }}" method="post" style="margin-top:1rem;">
+    <button class="btn btn-primary">🔍 Lancer le scraper</button>
+  </form>
+</div></div>
+{% endif %}
+{% endblock %}

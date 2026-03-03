@@ -1,0 +1,25 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Éditer — Admin UnivDZ{% endblock %}
+{% block content %}
+<h1 class="page-title">✎ Éditer l'événement</h1>
+<div class="card" style="max-width:700px;">
+  <div class="card-body">
+    <form method="post">
+      {% for field, label in [('titre','Titre'),('type','Type'),('universite','Université'),('discipline','Discipline'),('wilaya','Wilaya'),('lien_officiel','Lien officiel')] %}
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:.875rem; font-weight:500; margin-bottom:.3rem;">{{ label }}</label>
+        <input type="text" name="{{ field }}" value="{{ event[field] or '' }}" style="width:100%; padding:.55rem .85rem; border:1px solid #e5e7eb; border-radius:6px; font-family:inherit;">
+      </div>
+      {% endfor %}
+      <div style="margin-bottom:1rem;">
+        <label style="display:block; font-size:.875rem; font-weight:500; margin-bottom:.3rem;">Description</label>
+        <textarea name="description" rows="5" style="width:100%; padding:.55rem .85rem; border:1px solid #e5e7eb; border-radius:6px; font-family:inherit; resize:vertical;">{{ event.description or '' }}</textarea>
+      </div>
+      <div style="display:flex; gap:.75rem;">
+        <button type="submit" class="btn btn-primary">💾 Enregistrer</button>
+        <a href="{{ url_for('admin.queue') }}" class="btn btn-secondary">Annuler</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Dashboard — Admin UnivDZ{% endblock %}
+{% block content %}
+<h1 class="page-title">Tableau de bord</h1>
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; margin-bottom:2rem;">
+  <div class="card"><div class="card-body" style="text-align:center;"><p style="font-size:2.5rem; font-weight:800; color:#d97706;">{{ stats.a_verifier }}</p><p style="color:var(--muted); font-size:.875rem; margin-top:.25rem;">À vérifier</p></div></div>
+  <div class="card"><div class="card-body" style="text-align:center;"><p style="font-size:2.5rem; font-weight:800; color:#059669;">{{ stats.valide }}</p><p style="color:var(--muted); font-size:.875rem; margin-top:.25rem;">Validés</p></div></div>
+  <div class="card"><div class="card-body" style="text-align:center;"><p style="font-size:2.5rem; font-weight:800; color:#dc2626;">{{ stats.rejete }}</p><p style="color:var(--muted); font-size:.875rem; margin-top:.25rem;">Rejetés</p></div></div>
+</div>
+<div style="display:flex; gap:1rem; margin-bottom:2rem;">
+  <form action="{{ url_for('admin.lancer_scraper') }}" method="post">
+    <button type="submit" class="btn btn-primary">🔍 Lancer le scraper</button>
+  </form>
+  <a href="{{ url_for('admin.queue') }}" class="btn btn-secondary">📥 File d'attente</a>
+</div>
+<div class="card">
+  <div class="card-header">📥 Événements récents à vérifier</div>
+  {% if recents %}
+  <table>
+    <thead><tr><th>Titre</th><th>Type</th><th>Source</th><th>Collecté le</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for event in recents %}
+      <tr>
+        <td><strong>{{ event.titre[:60] }}</strong><br><small style="color:var(--muted);">{{ event.universite or '—' }}</small></td>
+        <td><span class="badge badge-warn">{{ event.type }}</span></td>
+        <td style="font-size:.8rem; color:var(--muted);">{{ event.source or '—' }}</td>
+        <td style="font-size:.8rem;">{{ event.date_collecte.strftime('%d/%m %H:%M') }}</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.valider', event_id=event.id) }}" style="display:inline;">
+            <button class="btn btn-success btn-sm" type="submit">✓</button>
+          </form>
+          <form method="post" action="{{ url_for('admin.rejeter', event_id=event.id) }}" style="display:inline; margin-left:.25rem;">
+            <button class="btn btn-danger btn-sm" type="submit">✗</button>
+          </form>
+          <a href="{{ url_for('admin.editer', event_id=event.id) }}" class="btn btn-secondary btn-sm" style="margin-left:.25rem;">✎</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="card-body" style="color:var(--muted); text-align:center; padding:2rem;">✅ Aucun événement en attente.</div>
+  {% endif %}
+</div>
+{% endblock %}
