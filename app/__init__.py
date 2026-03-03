@@ -36,4 +36,7 @@ def create_app(config_name="default"):
         schedule_jobs(scheduler, app)
         scheduler.start()
 
+    with app.app_context():
+        db.create_all()
+
     return app
