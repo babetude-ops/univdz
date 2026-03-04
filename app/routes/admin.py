@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime
 from app.models.event import Admin, Event
 from app import db
+import threading
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -55,7 +57,7 @@ def valider(event_id):
     event.date_validation = datetime.utcnow()
     event.validated_by = current_user.id
     db.session.commit()
-    flash(f'Événement "{event.titre[:50]}" validé.', "success")
+    flash("Evenement valide.", "success")
     return redirect(request.referrer or url_for("admin.queue"))
 
 
@@ -67,7 +69,7 @@ def rejeter(event_id):
     event.date_validation = datetime.utcnow()
     event.validated_by = current_user.id
     db.session.commit()
-    flash(f'Événement "{event.titre[:50]}" rejeté.', "warning")
+    flash("Evenement rejete.", "warning")
     return redirect(request.referrer or url_for("admin.queue"))
 
 
@@ -84,7 +86,7 @@ def editer(event_id):
         event.description = request.form.get("description", event.description)
         event.lien_officiel = request.form.get("lien_officiel", event.lien_officiel)
         db.session.commit()
-        flash("Événement mis à jour.", "success")
+        flash("Evenement mis a jour.", "success")
         return redirect(url_for("admin.queue"))
     return render_template("admin/editer.html", event=event)
 
@@ -93,11 +95,18 @@ def editer(event_id):
 @login_required
 def lancer_scraper():
     from app.scrapers.runner import run_all_scrapers
-    try:
-        count = run_all_scrapers()
-        flash(f"{count} événement(s) collecté(s) et ajouté(s) à la file.", "success")
-    except Exception as e:
-        flash(f"Erreur lors du scraping : {str(e)}", "danger")
+    app = current_app._get_current_object()
+
+    def scraper_thread():
+        try:
+            run_all_scrapers(app)
+        except Exception as e:
+            app.logger.error("[Scraper] Erreur thread: %s", str(e))
+
+    t = threading.Thread(target=scraper_thread, daemon=True)
+    t.start()
+
+    flash("Scraping lance en arriere-plan ! Revenez dans quelques minutes.", "success")
     return redirect(url_for("admin.dashboard"))
 
 
@@ -110,7 +119,7 @@ def valider_revue(revue_id):
     revue.date_validation = datetime.utcnow()
     revue.validated_by = current_user.id
     db.session.commit()
-    flash(f'Revue "{revue.nom[:50]}" validée.', "success")
+    flash("Revue validee.", "success")
     return redirect(request.referrer or url_for("admin.dashboard"))
 
 
@@ -123,7 +132,7 @@ def rejeter_revue(revue_id):
     revue.date_validation = datetime.utcnow()
     revue.validated_by = current_user.id
     db.session.commit()
-    flash(f'Revue "{revue.nom[:50]}" rejetée.', "warning")
+    flash("Revue rejetee.", "warning")
     return redirect(request.referrer or url_for("admin.dashboard"))
 
 
@@ -131,12 +140,19 @@ def rejeter_revue(revue_id):
 @login_required
 def lancer_scraper_asjp():
     from app.scrapers.asjp import ASJPScraper
-    try:
-        scraper = ASJPScraper()
-        count = scraper.run_revues(current_app._get_current_object())
-        flash(f"{count} revue(s) ASJP collectée(s).", "success")
-    except Exception as e:
-        flash(f"Erreur ASJP : {str(e)}", "danger")
+    app = current_app._get_current_object()
+
+    def asjp_thread():
+        try:
+            scraper = ASJPScraper()
+            scraper.run_revues(app)
+        except Exception as e:
+            app.logger.error("[ASJP] Erreur thread: %s", str(e))
+
+    t = threading.Thread(target=asjp_thread, daemon=True)
+    t.start()
+
+    flash("Scraping ASJP lance en arriere-plan !", "success")
     return redirect(url_for("admin.dashboard"))
 
 
@@ -161,7 +177,7 @@ def setup_db():
                     date_debut=date(2025, 11, 15),
                     date_fin=date(2025, 11, 17),
                     date_limite=date(2025, 9, 30),
-                    description="Un colloque réunissant des chercheurs autour des avancées en IA.",
+                    description="Un colloque reunissant des chercheurs autour des avancees en IA.",
                     lien_officiel="https://www.usthb.dz",
                     source="USTHB",
                     statut="valide",
@@ -169,13 +185,13 @@ def setup_db():
                     slug="colloque-ia-usthb-2025",
                 ),
                 Event(
-                    titre="Bourse de Doctorat en Sciences Médicales",
+                    titre="Bourse de Doctorat en Sciences Medicales",
                     type="bourse",
-                    universite="Campus France Algérie",
-                    discipline="Sciences médicales",
+                    universite="Campus France Algerie",
+                    discipline="Sciences medicales",
                     wilaya="Alger",
                     date_limite=date(2025, 7, 15),
-                    description="Programme de bourses pour étudiants algériens.",
+                    description="Programme de bourses pour etudiants algeriens.",
                     lien_officiel="https://www.campusfrance.org",
                     source="Campus France",
                     statut="valide",
@@ -183,15 +199,15 @@ def setup_db():
                     slug="bourse-doctorat-medecine-2025",
                 ),
                 Event(
-                    titre="Séminaire National sur les Énergies Renouvelables",
-                    type="séminaire",
-                    universite="Université de Béjaïa",
-                    discipline="Sciences de l'ingénieur",
-                    wilaya="Béjaïa",
+                    titre="Seminaire National sur les Energies Renouvelables",
+                    type="seminaire",
+                    universite="Universite de Bejaia",
+                    discipline="Sciences de l'ingenieur",
+                    wilaya="Bejaia",
                     date_debut=date(2025, 10, 5),
-                    description="Séminaire sur les nouvelles technologies énergétiques.",
+                    description="Seminaire sur les nouvelles technologies energetiques.",
                     lien_officiel="https://www.univ-bejaia.dz",
-                    source="Université Béjaïa",
+                    source="Universite Bejaia",
                     statut="valide",
                     score_fiabilite=0.85,
                     slug="seminaire-energies-renouvelables-bejaia-2025",
@@ -200,6 +216,6 @@ def setup_db():
             for e in events:
                 db.session.add(e)
         db.session.commit()
-        return "<h1 style='color:green;font-family:sans-serif'>✅ Base initialisée !<br>Admin: admin / UnivDZ2024!<br><br><a href='/admin' style='color:green'>Aller à l'admin →</a></h1>"
+        return "<h1 style='color:green'>OK Base initialisee ! Admin: admin / UnivDZ2024! <a href='/admin'>Aller admin</a></h1>"
     except Exception as e:
-        return f"<h1 style='color:red'>❌ Erreur: {str(e)}</h1>"
+        return "<h1 style='color:red'>Erreur: " + str(e) + "</h1>"
