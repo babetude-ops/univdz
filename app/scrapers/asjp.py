@@ -1,15 +1,20 @@
 """
 Scraper ASJP — Version améliorée
 Combine la logique de détection d'URLs de Manus + notre intégration Flask
+SSL verify désactivé car certificat ASJP expiré
+Limité à 20 revues pour respecter la mémoire du plan gratuit Render
 """
 import re
 import logging
 import time
+import urllib3
 from datetime import datetime, date
 from typing import List, Dict, Optional
 import requests
 from bs4 import BeautifulSoup
 from app.scrapers.base import BaseScraper
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +58,6 @@ def detect_domaine(texte: str) -> str:
 
 
 def parse_date(date_str: str) -> Optional[date]:
-    from datetime import datetime
-    # Remplacer mois français
     date_str_lower = date_str.lower()
     for mois, num in MOIS_FR.items():
         date_str_lower = date_str_lower.replace(mois, str(num).zfill(2))
@@ -67,7 +70,6 @@ def parse_date(date_str: str) -> Optional[date]:
 
 
 def extract_date(texte: str) -> Optional[date]:
-    # Format JJ/MM/AAAA
     m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", texte)
     if m:
         try:
@@ -76,7 +78,6 @@ def extract_date(texte: str) -> Optional[date]:
                 return date(y, mo, d)
         except Exception:
             pass
-    # Format JJ mois AAAA
     m = re.search(
         r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})",
         texte.lower()
@@ -111,7 +112,6 @@ class ASJPScraper(BaseScraper):
             return None
 
     def get_all_journals(self) -> List[Dict]:
-        """Récupérer tous les liens de revues — méthode Manus améliorée."""
         journals = []
         seen = set()
 
@@ -120,7 +120,6 @@ class ASJPScraper(BaseScraper):
             if not soup:
                 continue
 
-            # Méthode Manus : chercher /PresentationRevue/
             for a in soup.find_all("a", href=re.compile(r"PresentationRevue/\d+")):
                 name = a.get_text(strip=True)
                 href = a.get("href", "")
@@ -129,7 +128,6 @@ class ASJPScraper(BaseScraper):
                     seen.add(url)
                     journals.append({"name": name, "url": url})
 
-            # Méthode alternative : chercher /revues/\d+
             for a in soup.find_all("a", href=re.compile(r"/revues/\d+")):
                 name = a.get_text(strip=True)
                 href = a.get("href", "")
@@ -144,17 +142,13 @@ class ASJPScraper(BaseScraper):
         return journals
 
     def get_calls_for_papers(self, journal: Dict) -> Optional[Dict]:
-        """Vérifier si une revue a un appel à soumission ouvert."""
         soup = self.fetch(journal["url"])
         if not soup:
             return None
 
         page_text = soup.get_text(separator=" ").lower()
 
-        # Vérifier appel ouvert
         has_appel = any(kw in page_text for kw in APPEL_KEYWORDS)
-
-        # Méthode Manus : chercher lien callForPapers
         call_links = soup.find_all("a", href=re.compile(r"callForPapers|Appel", re.IGNORECASE))
         if call_links:
             has_appel = True
@@ -162,13 +156,11 @@ class ASJPScraper(BaseScraper):
         if not has_appel:
             return None
 
-        # Nom de la revue
         nom = journal["name"]
         if not nom:
             h = soup.find("h1") or soup.find("h2")
             nom = h.get_text(strip=True) if h else "Revue sans nom"
 
-        # Description
         description = ""
         for cls in ["description", "about", "resume", "presentation"]:
             tag = soup.find(class_=re.compile(cls, re.I))
@@ -176,20 +168,12 @@ class ASJPScraper(BaseScraper):
                 description = tag.get_text(strip=True)[:500]
                 break
 
-        # Université
         universite = ""
         m = re.search(r"(université[^,\n]{5,60}|univ\.[^,\n]{5,40})", page_text, re.I)
         if m:
             universite = m.group(0).strip()[:200]
 
-        # Date limite
         date_limite = extract_date(page_text)
-
-        # ISSN
-        issn = ""
-        m = re.search(r"(?:e?issn|issn)[:\s]*([\d\-Xx]{4,12})", page_text, re.I)
-        if m:
-            issn = m.group(1).strip()
 
         return {
             "nom": nom[:500],
@@ -207,14 +191,15 @@ class ASJPScraper(BaseScraper):
         revues = []
         journals = self.get_all_journals()
 
-        for i, journal in enumerate(journals[:80]):
+        # Limité à 20 revues pour respecter la mémoire plan gratuit Render
+        for i, journal in enumerate(journals[:20]):
             try:
                 result = self.get_calls_for_papers(journal)
                 if result:
                     revues.append(result)
                     logger.info(f"[ASJP] ✅ {result['nom'][:50]}")
-                if i % 10 == 0:
-                    time.sleep(2)
+                if i % 5 == 0:
+                    time.sleep(1)
             except Exception as e:
                 logger.error(f"[ASJP] Erreur {journal['url']}: {e}")
 
