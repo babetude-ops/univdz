@@ -16,6 +16,16 @@ def create_app(config_name="default"):
     from config.settings import config
     app.config.from_object(config[config_name])
 
+    # ─── Fix connexion PostgreSQL intermittente ────────────────
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,        # Vérifier la connexion avant chaque requête
+        "pool_recycle": 300,          # Recycler les connexions toutes les 5 min
+        "pool_timeout": 30,           # Timeout de 30s
+        "connect_args": {
+            "connect_timeout": 10,
+        },
+    }
+
     db.init_app(app)
     migrate.init_app(app, db)
 
@@ -41,6 +51,7 @@ def create_app(config_name="default"):
         _create_admin()
 
     return app
+
 
 def _create_admin():
     import os
