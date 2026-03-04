@@ -14,8 +14,7 @@ class ProductionConfig:
     DEBUG = False
     SECRET_KEY = os.environ.get("SECRET_KEY", "univdz-secret-key-2024")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql+pg8000://").replace("postgresql://", "postgresql+pg8000://")
-
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", "").replace("postgres://", "postgresql://")
 
 config = {
     "development": DevelopmentConfig,
