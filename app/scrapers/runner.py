@@ -12,14 +12,14 @@ SCRAPERS = [
     GenericUnivScraper(
         site_name="Université Béjaïa",
         base_url="https://www.univ-bejaia.dz",
-        news_path="/fr/actualites",
+        news_paths=["/univ-actualites", "/actualites", "/fr/actualites"],
         universite="Université Abderrahmane Mira de Béjaïa",
         wilaya="Béjaïa",
     ),
     GenericUnivScraper(
         site_name="Université Sétif 1",
         base_url="https://www.univ-setif.dz",
-        news_path="/actualites",
+        news_paths=["/actualites", "/fr/actualites"],
         universite="Université Ferhat Abbas Sétif 1",
         wilaya="Sétif",
     ),
@@ -42,10 +42,9 @@ def run_all_scrapers(app=None) -> int:
     _app = app or current_app._get_current_object()
     total = 0
 
-    logger.info(f"[Runner] 🚀 Lancement multithreading — {len(SCRAPERS)} universités en parallèle...")
+    logger.info(f"[Runner] 🚀 Lancement — {len(SCRAPERS)} universités...")
 
-    # ─── Scrapers universités en parallèle ────────────────────
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {
             executor.submit(run_scraper, scraper, _app): scraper.site_name
             for scraper in SCRAPERS
@@ -53,7 +52,6 @@ def run_all_scrapers(app=None) -> int:
         for future in as_completed(futures):
             total += future.result()
 
-    # ─── Scraper MESRS — bourses uniquement ───────────────────
     try:
         mesrs = MESRSScraper()
         count = mesrs.run(_app)
@@ -62,7 +60,6 @@ def run_all_scrapers(app=None) -> int:
     except Exception as e:
         logger.error(f"[Runner] ❌ Erreur MESRS: {e}")
 
-    # ─── Scraper ASJP — revues scientifiques ──────────────────
     try:
         from app.scrapers.asjp import ASJPScraper
         asjp = ASJPScraper()
@@ -74,3 +71,4 @@ def run_all_scrapers(app=None) -> int:
 
     logger.info(f"[Runner] 🏁 Total collecté: {total}")
     return total
+
