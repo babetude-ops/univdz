@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime
 from app.models.event import Admin, Event
@@ -99,6 +99,8 @@ def lancer_scraper():
     except Exception as e:
         flash(f"Erreur lors du scraping : {str(e)}", "danger")
     return redirect(url_for("admin.dashboard"))
+
+
 @admin_bp.route("/revues/valider/<int:revue_id>", methods=["POST"])
 @login_required
 def valider_revue(revue_id):
@@ -136,29 +138,68 @@ def lancer_scraper_asjp():
     except Exception as e:
         flash(f"Erreur ASJP : {str(e)}", "danger")
     return redirect(url_for("admin.dashboard"))
+
+
 @admin_bp.route("/setup-secret-univdz-2024")
 def setup_db():
-    from app import db
-    from app.models.event import Event, Admin, Revue
+    from app.models.event import Revue
     from datetime import date
     try:
         db.create_all()
-        # Créer admin si inexistant
         if not Admin.query.filter_by(username="admin").first():
             admin = Admin(username="admin", email="admin@univdz.dz", is_superadmin=True)
             admin.set_password("UnivDZ2024!")
             db.session.add(admin)
-        # Insérer données de test si vide
         if Event.query.count() == 0:
             events = [
-                Event(titre="Colloque International sur l'Intelligence Artificielle", type="colloque", universite="USTHB", discipline="Informatique", wilaya="Alger", date_debut=date(2025, 11, 15), date_fin=date(2025, 11, 17), date_limite=date(2025, 9, 30), description="Un colloque réunissant des chercheurs autour des avancées en IA.", lien_officiel="https://www.usthb.dz", source="USTHB", statut="valide", score_fiabilite=0.9, slug="colloque-ia-usthb-2025"),
-                Event(titre="Bourse de Doctorat en Sciences Médicales", type="bourse", universite="Campus France Algérie", discipline="Sciences médicales", wilaya="Alger", date_limite=date(2025, 7, 15), description="Programme de bourses pour étudiants algériens.", lien_officiel="https://www.campusfrance.org", source="Campus France", statut="valide", score_fiabilite=0.95, slug="bourse-doctorat-medecine-2025"),
-                Event(titre="Séminaire National sur les Énergies Renouvelables", type="séminaire", universite="Université de Béjaïa", discipline="Sciences de l'ingénieur", wilaya="Béjaïa", date_debut=date(2025, 10, 5), description="Séminaire sur les nouvelles technologies énergétiques.", lien_officiel="https://www.univ-bejaia.dz", source="Université Béjaïa", statut="valide", score_fiabilite=0.85, slug="seminaire-energies-renouvelables-bejaia-2025"),
+                Event(
+                    titre="Colloque International sur l'Intelligence Artificielle",
+                    type="colloque",
+                    universite="USTHB",
+                    discipline="Informatique",
+                    wilaya="Alger",
+                    date_debut=date(2025, 11, 15),
+                    date_fin=date(2025, 11, 17),
+                    date_limite=date(2025, 9, 30),
+                    description="Un colloque réunissant des chercheurs autour des avancées en IA.",
+                    lien_officiel="https://www.usthb.dz",
+                    source="USTHB",
+                    statut="valide",
+                    score_fiabilite=0.9,
+                    slug="colloque-ia-usthb-2025",
+                ),
+                Event(
+                    titre="Bourse de Doctorat en Sciences Médicales",
+                    type="bourse",
+                    universite="Campus France Algérie",
+                    discipline="Sciences médicales",
+                    wilaya="Alger",
+                    date_limite=date(2025, 7, 15),
+                    description="Programme de bourses pour étudiants algériens.",
+                    lien_officiel="https://www.campusfrance.org",
+                    source="Campus France",
+                    statut="valide",
+                    score_fiabilite=0.95,
+                    slug="bourse-doctorat-medecine-2025",
+                ),
+                Event(
+                    titre="Séminaire National sur les Énergies Renouvelables",
+                    type="séminaire",
+                    universite="Université de Béjaïa",
+                    discipline="Sciences de l'ingénieur",
+                    wilaya="Béjaïa",
+                    date_debut=date(2025, 10, 5),
+                    description="Séminaire sur les nouvelles technologies énergétiques.",
+                    lien_officiel="https://www.univ-bejaia.dz",
+                    source="Université Béjaïa",
+                    statut="valide",
+                    score_fiabilite=0.85,
+                    slug="seminaire-energies-renouvelables-bejaia-2025",
+                ),
             ]
             for e in events:
                 db.session.add(e)
         db.session.commit()
-        return "<h1 style='color:green;font-family:sans-serif'>✅ Base initialisée ! Admin: admin / UnivDZ2024!<br><a href='/admin'>Aller à l'admin</a></h1>"
+        return "<h1 style='color:green;font-family:sans-serif'>✅ Base initialisée !<br>Admin: admin / UnivDZ2024!<br><br><a href='/admin' style='color:green'>Aller à l'admin →</a></h1>"
     except Exception as e:
         return f"<h1 style='color:red'>❌ Erreur: {str(e)}</h1>"
-
