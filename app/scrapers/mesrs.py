@@ -80,12 +80,10 @@ class MESRSScraper:
     TIMEOUT = 25
 
     URLS_BOURSES = [
-        "/index.php/fr/cooperation-interuniversitaire/bourses-et-allocations",
+        "/index.php/fr/actualites/",
         "/index.php/fr/cooperation-interuniversitaire/",
-        "/index.php/fr/bourses-et-allocations/",
-        "/index.php/fr/actualites/bourses",
     ]
-
+    
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({

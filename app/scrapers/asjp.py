@@ -102,7 +102,7 @@ class ASJPScraper(BaseScraper):
 
     def fetch(self, url: str):
         try:
-            resp = self.session.get(url, timeout=self.timeout)
+            resp = self.session.get(url, timeout=self.timeout, verify=False)
             resp.raise_for_status()
             resp.encoding = resp.apparent_encoding
             return BeautifulSoup(resp.text, "html.parser")
