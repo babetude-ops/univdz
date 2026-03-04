@@ -9,12 +9,15 @@ class USThBScraper(BaseScraper):
 
     def scrape(self) -> list[dict]:
         events = []
-        soup = self.fetch(f"{self.base_url}/actualites")
+        for path in ["/actualites", "/fr/actualites", "/news"]:
+            soup = self.fetch(f"{self.base_url}{path}")
+            if soup:
+                break
         if not soup:
             return events
         articles = soup.find_all("article") or soup.find_all("div", class_=re.compile(r"post|news|event"))
         for article in articles:
-            title_tag = article.find("h2") or article.find("h3") or article.find("h4")
+            title_tag = article.find(["h2", "h3", "h4"])
             if not title_tag:
                 continue
             titre = title_tag.get_text(strip=True)
@@ -36,7 +39,10 @@ class UniOran1Scraper(BaseScraper):
 
     def scrape(self) -> list[dict]:
         events = []
-        soup = self.fetch(f"{self.base_url}/index.php/actualites")
+        for path in ["/actualites", "/index.php/actualites", "/fr/actualites"]:
+            soup = self.fetch(f"{self.base_url}{path}")
+            if soup:
+                break
         if not soup:
             return events
         for item in soup.select(".item-list li, .view-content .views-row, article"):
@@ -60,7 +66,10 @@ class UniConstantine1Scraper(BaseScraper):
 
     def scrape(self) -> list[dict]:
         events = []
-        soup = self.fetch(f"{self.base_url}/fr/actualites/actualites-umc")
+        for path in ["/fr/actualites", "/fr/actualites/actualites-umc", "/actualites"]:
+            soup = self.fetch(f"{self.base_url}{path}")
+            if soup:
+                break
         if not soup:
             return events
         for item in soup.select(".actualite, .news-item, article, li.item"):
@@ -79,17 +88,21 @@ class UniConstantine1Scraper(BaseScraper):
 
 
 class GenericUnivScraper(BaseScraper):
-    def __init__(self, site_name, base_url, news_path, universite, wilaya):
+    def __init__(self, site_name, base_url, news_paths, universite, wilaya):
         self.site_name = site_name
         self.base_url = base_url
-        self.news_path = news_path
+        self.news_paths = news_paths if isinstance(news_paths, list) else [news_paths]
         self.universite = universite
         self.wilaya = wilaya
 
     def scrape(self) -> list[dict]:
         events = []
-        url = self.base_url.rstrip("/") + "/" + self.news_path.lstrip("/")
-        soup = self.fetch(url)
+        soup = None
+        for path in self.news_paths:
+            url = self.base_url.rstrip("/") + "/" + path.lstrip("/")
+            soup = self.fetch(url)
+            if soup:
+                break
         if not soup:
             return events
         KEYWORDS = ["colloque", "séminaire", "journée d'étude", "conférence", "appel", "communication", "bourse", "atelier"]
@@ -107,3 +120,26 @@ class GenericUnivScraper(BaseScraper):
                     lien = self.base_url.rstrip("/") + "/" + lien.lstrip("/")
             events.append({"titre": text[:400], "lien_officiel": lien, "universite": self.universite, "wilaya": self.wilaya})
         return events
+
+
+ALGERIAN_UNIVERSITY_SCRAPERS = [
+    GenericUnivScraper("Université Alger 1", "https://www.univ-alger.dz", ["actualites", "fr/actualites"], "Université Alger 1", "Alger"),
+    GenericUnivScraper("Université Alger 2", "https://www.univ-alger2.dz", ["actualites", "fr/actualites"], "Université Alger 2", "Alger"),
+    GenericUnivScraper("Université Alger 3", "https://www.univ-alger3.dz", ["actualites", "fr/actualites"], "Université Alger 3", "Alger"),
+    GenericUnivScraper("Université Blida 1", "https://www.univ-blida.dz", ["actualites", "fr/actualites"], "Université Blida 1", "Blida"),
+    GenericUnivScraper("Université Blida 2", "https://www.univ-blida2.dz", ["actualites", "fr/actualites"], "Université Blida 2", "Blida"),
+    GenericUnivScraper("Université Tlemcen", "https://www.univ-tlemcen.dz", ["actualites", "fr/actualites"], "Université Tlemcen", "Tlemcen"),
+    GenericUnivScraper("Université Bejaia", "https://www.univ-bejaia.dz", ["univ-actualites", "actualites"], "Université Bejaia", "Bejaia"),
+    GenericUnivScraper("Université Setif 1", "https://www.univ-setif.dz", ["actualites", "fr/actualites"], "Université Setif 1", "Setif"),
+    GenericUnivScraper("Université Setif 2", "https://www.univ-setif2.dz", ["actualites", "fr/actualites"], "Université Setif 2", "Setif"),
+    GenericUnivScraper("Université Batna 1", "https://www.univ-batna.dz", ["actualites", "fr/actualites"], "Université Batna 1", "Batna"),
+    GenericUnivScraper("Université Batna 2", "https://www.univ-batna2.dz", ["actualites", "fr/actualites"], "Université Batna 2", "Batna"),
+    GenericUnivScraper("Université Biskra", "https://www.univ-biskra.dz", ["actualites", "fr/actualites"], "Université Biskra", "Biskra"),
+    GenericUnivScraper("Université Ouargla", "https://www.univ-ouargla.dz", ["actualites", "fr/actualites"], "Université Ouargla", "Ouargla"),
+    GenericUnivScraper("Université Mostaganem", "https://www.univ-mosta.dz", ["actualites", "fr/actualites"], "Université Mostaganem", "Mostaganem"),
+    GenericUnivScraper("Université Chlef", "https://www.univ-chlef.dz", ["actualites", "fr/actualites"], "Université Chlef", "Chlef"),
+    GenericUnivScraper("Université Mascara", "https://www.univ-mascara.dz", ["actualites", "fr/actualites"], "Université Mascara", "Mascara"),
+]
+
+
+
