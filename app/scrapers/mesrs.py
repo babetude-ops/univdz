@@ -1,6 +1,7 @@
 """
-Scraper MESRS — Version corrigée
-Encodage UTF-8 + sélection précise des articles
+Scraper MESRS — Bourses uniquement
+On ne scrape que les bourses et allocations pour rester
+dans le domaine de la recherche scientifique.
 """
 import re
 import logging
@@ -21,33 +22,18 @@ MOIS_FR = {
 BOURSE_KEYWORDS = [
     "bourse", "scholarship", "fellowship", "financement",
     "allocation", "mobilité", "erasmus", "campus france",
-    "coopération", "programme de bourse", "appel à candidature",
+    "programme de bourse", "appel à candidature", "bourse de recherche",
+    "bourse doctorat", "bourse master", "bourse post-doctorat",
+    "coopération universitaire", "échange universitaire",
 ]
-
-EVENT_KEYWORDS = [
-    "colloque", "séminaire", "conférence", "journée d'étude",
-    "atelier", "workshop", "forum", "symposium",
-    "appel à communication", "journée nationale", "journée internationale",
-]
-
-EVENT_TYPES = {
-    "colloque": "colloque",
-    "séminaire": "séminaire",
-    "conférence": "conférence",
-    "journée d'étude": "journée_etude",
-    "journée": "journée_etude",
-    "atelier": "atelier",
-    "workshop": "atelier",
-    "forum": "conférence",
-    "symposium": "colloque",
-    "appel à communication": "appel_communication",
-}
 
 TITRES_IGNORER = [
     "enseignant", "etablissement", "étudiant", "accueil", "home",
     "menu", "navigation", "footer", "header", "recherche", "search",
     "connexion", "login", "contact", "plan du site", "sitemap",
     "activités ministérielles", "ministère", "actualités",
+    "acquisition", "marché public", "avis de consultation",
+    "promotion", "recrutement", "concours", "poste",
 ]
 
 
@@ -57,9 +43,15 @@ def is_titre_valide(titre: str) -> bool:
     titre_lower = titre.lower().strip()
     if any(t == titre_lower for t in TITRES_IGNORER):
         return False
-    if any(titre_lower.startswith(t) for t in TITRES_IGNORER[:6]):
+    if any(titre_lower.startswith(t) for t in TITRES_IGNORER):
         return False
     return True
+
+
+def is_bourse(titre: str, description: str = "") -> bool:
+    """Vérifier strictement que c'est une bourse."""
+    texte = (titre + " " + description).lower()
+    return any(kw in texte for kw in BOURSE_KEYWORDS)
 
 
 def parse_date(texte: str) -> Optional[date]:
@@ -91,12 +83,7 @@ class MESRSScraper:
         "/index.php/fr/cooperation-interuniversitaire/bourses-et-allocations",
         "/index.php/fr/cooperation-interuniversitaire/",
         "/index.php/fr/bourses-et-allocations/",
-    ]
-
-    URLS_ACTUALITES = [
-        "/index.php/fr/actualites/evenements",
-        "/index.php/fr/actualites/colloques-et-seminaires",
-        "/index.php/fr/actualites/",
+        "/index.php/fr/actualites/bourses",
     ]
 
     def __init__(self):
@@ -170,10 +157,10 @@ class MESRSScraper:
             if not soup:
                 continue
 
+            # Méthode 1 : articles structurés
             articles = self._extraire_articles(soup, url)
             for art in articles:
-                titre_lower = art["titre"].lower()
-                if not any(kw in titre_lower for kw in BOURSE_KEYWORDS):
+                if not is_bourse(art["titre"], art["description"]):
                     continue
                 if art["titre"] in seen:
                     continue
@@ -189,15 +176,14 @@ class MESRSScraper:
                     "universite": "MESRS",
                 })
 
+            # Méthode 2 : liens directs avec mots-clés bourses
             for a in soup.find_all("a", href=True):
                 texte = a.get_text(strip=True)
-                if len(texte) < 15:
+                if not is_titre_valide(texte):
                     continue
-                if not any(kw in texte.lower() for kw in BOURSE_KEYWORDS):
+                if not is_bourse(texte):
                     continue
                 if texte in seen:
-                    continue
-                if not is_titre_valide(texte):
                     continue
                 seen.add(texte)
                 href = a.get("href", "")
@@ -217,45 +203,6 @@ class MESRSScraper:
 
         logger.info(f"[MESRS] {len(bourses)} bourses trouvées")
         return bourses
-
-    def get_events(self) -> List[Dict]:
-        events = []
-        seen = set()
-
-        for path in self.URLS_ACTUALITES:
-            url = self.BASE_URL + path
-            soup = self.fetch(url)
-            if not soup:
-                continue
-
-            articles = self._extraire_articles(soup, url)
-            for art in articles:
-                if art["titre"] in seen:
-                    continue
-                seen.add(art["titre"])
-
-                event_type = "conférence"
-                titre_lower = art["titre"].lower()
-                for kw, t in EVENT_TYPES.items():
-                    if kw in titre_lower:
-                        event_type = t
-                        break
-
-                events.append({
-                    "titre": art["titre"],
-                    "description": art["description"],
-                    "date_debut": art["date"],
-                    "lien_officiel": art["lien"],
-                    "type": event_type,
-                    "source": "MESRS",
-                    "wilaya": "National",
-                    "universite": "MESRS",
-                })
-
-            time.sleep(1)
-
-        logger.info(f"[MESRS] {len(events)} événements trouvés")
-        return events
 
     def run(self, app) -> int:
         from app import db
@@ -287,31 +234,6 @@ class MESRSScraper:
                     count += 1
                 except Exception as e:
                     logger.error(f"[MESRS] Erreur bourse: {e}")
-                    db.session.rollback()
-
-            for raw in self.get_events():
-                try:
-                    if Event.query.filter_by(titre=raw["titre"], source="MESRS").first():
-                        continue
-                    slug = generate_slug(raw["titre"], raw.get("date_debut"))
-                    event = Event(
-                        titre=raw["titre"],
-                        type=raw.get("type", "conférence"),
-                        description=raw.get("description", ""),
-                        date_debut=raw.get("date_debut"),
-                        lien_officiel=raw.get("lien_officiel", ""),
-                        source="MESRS",
-                        wilaya="National",
-                        universite="MESRS",
-                        statut="a_verifier",
-                        score_fiabilite=0.75,
-                        date_collecte=datetime.utcnow(),
-                        slug=slug,
-                    )
-                    db.session.add(event)
-                    count += 1
-                except Exception as e:
-                    logger.error(f"[MESRS] Erreur event: {e}")
                     db.session.rollback()
 
             db.session.commit()
