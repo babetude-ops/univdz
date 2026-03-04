@@ -43,7 +43,6 @@ EVENT_TYPES = {
     "appel à communication": "appel_communication",
 }
 
-# Titres parasites à ignorer
 TITRES_IGNORER = [
     "enseignant", "etablissement", "étudiant", "accueil", "home",
     "menu", "navigation", "footer", "header", "recherche", "search",
@@ -52,16 +51,7 @@ TITRES_IGNORER = [
 ]
 
 
-def fix_encoding(texte: str) -> str:
-    """Corriger les problèmes d'encodage."""
-    try:
-        return texte.encode("latin-1").decode("utf-8")
-    except Exception:
-        return texte
-
-
 def is_titre_valide(titre: str) -> bool:
-    """Vérifier que le titre est un vrai événement."""
     if len(titre) < 15:
         return False
     titre_lower = titre.lower().strip()
@@ -114,14 +104,12 @@ class MESRSScraper:
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept-Language": "fr-FR,fr;q=0.9",
-            "Accept-Charset": "utf-8",
         })
 
     def fetch(self, url: str) -> Optional[BeautifulSoup]:
         try:
             resp = self.session.get(url, timeout=self.TIMEOUT)
             resp.raise_for_status()
-            # Forcer UTF-8
             resp.encoding = "utf-8"
             return BeautifulSoup(resp.text, "html.parser")
         except Exception as e:
@@ -129,10 +117,8 @@ class MESRSScraper:
             return None
 
     def _extraire_articles(self, soup: BeautifulSoup, source_url: str) -> List[Dict]:
-        """Extraire les vrais articles d'une page."""
         articles = []
 
-        # Chercher les conteneurs d'articles Joomla (structure MESRS)
         conteneurs = (
             soup.find_all("div", class_=re.compile(r"items-row|item-page|blog|article|news", re.I)) or
             soup.find_all("article") or
@@ -140,7 +126,6 @@ class MESRSScraper:
         )
 
         for conteneur in conteneurs:
-            # Chercher le titre via lien ou heading
             titre_tag = (
                 conteneur.find("a", class_=re.compile(r"title|heading|link", re.I)) or
                 conteneur.find(["h2", "h3", "h4"])
@@ -152,12 +137,10 @@ class MESRSScraper:
             if not is_titre_valide(titre):
                 continue
 
-            # Lien de détail
             lien_tag = conteneur.find("a", href=True)
             href = lien_tag.get("href", source_url) if lien_tag else source_url
             full_url = href if href.startswith("http") else self.BASE_URL + href
 
-            # Description
             description = ""
             intro = conteneur.find(class_=re.compile(r"intro|summary|description|body", re.I))
             if not intro:
@@ -165,7 +148,6 @@ class MESRSScraper:
             if intro:
                 description = intro.get_text(strip=True)[:400]
 
-            # Date
             texte_complet = conteneur.get_text()
             date_trouvee = parse_date(texte_complet)
 
@@ -189,7 +171,6 @@ class MESRSScraper:
                 continue
 
             articles = self._extraire_articles(soup, url)
-
             for art in articles:
                 titre_lower = art["titre"].lower()
                 if not any(kw in titre_lower for kw in BOURSE_KEYWORDS):
@@ -208,7 +189,6 @@ class MESRSScraper:
                     "universite": "MESRS",
                 })
 
-            # Aussi chercher les liens directs
             for a in soup.find_all("a", href=True):
                 texte = a.get_text(strip=True)
                 if len(texte) < 15:
@@ -249,15 +229,13 @@ class MESRSScraper:
                 continue
 
             articles = self._extraire_articles(soup, url)
-
             for art in articles:
-                titre_lower = art["titre"].lower()
                 if art["titre"] in seen:
                     continue
                 seen.add(art["titre"])
 
-                # Détecter le type
                 event_type = "conférence"
+                titre_lower = art["titre"].lower()
                 for kw, t in EVENT_TYPES.items():
                     if kw in titre_lower:
                         event_type = t
@@ -338,5 +316,3 @@ class MESRSScraper:
 
             db.session.commit()
         return count
-```
-
