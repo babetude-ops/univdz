@@ -161,4 +161,4 @@ def setup_db():
         return "<h1 style='color:green;font-family:sans-serif'>✅ Base initialisée ! Admin: admin / UnivDZ2024!<br><a href='/admin'>Aller à l'admin</a></h1>"
     except Exception as e:
         return f"<h1 style='color:red'>❌ Erreur: {str(e)}</h1>"
-```
+
