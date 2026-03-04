@@ -48,7 +48,7 @@ def _create_admin():
     admin_username = os.environ.get("ADMIN_USERNAME", "admin")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     if not Admin.query.filter_by(username=admin_username).first():
-        admin = Admin(username=admin_username)
+        admin = Admin(username=admin_username, email=os.environ.get("ADMIN_EMAIL", "admin@univdz.dz"))
         admin.set_password(admin_password)
         db.session.add(admin)
         db.session.commit()
