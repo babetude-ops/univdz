@@ -1,29 +1,47 @@
 """
-Scraper ASJP — Algerian Scientific Journal Platform
-Détecte les revues ayant publié un appel à soumission.
-https://www.asjp.cerist.dz
+Scraper ASJP — Version améliorée
+Combine la logique de détection d'URLs de Manus + notre intégration Flask
 """
 import re
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, date
+from typing import List, Dict, Optional
+import requests
+from bs4 import BeautifulSoup
 from app.scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
 DOMAINES_KEYWORDS = {
-    "Sciences exactes et naturelles": ["mathématique", "physique", "chimie", "biologie", "sciences exactes", "astronomie"],
-    "Sciences de la vie": ["médecine", "pharmacie", "vétérinaire", "santé", "biochimie", "sciences de la vie"],
-    "Sciences de la terre": ["géologie", "géographie", "environnement", "sciences de la terre", "hydraulique"],
-    "Sciences de l'ingénieur": ["génie", "électronique", "mécanique", "informatique", "technologie", "ingénieur"],
-    "Sciences humaines": ["histoire", "philosophie", "archéologie", "sciences humaines", "patrimoine"],
-    "Sciences sociales": ["sociologie", "psychologie", "anthropologie", "sciences sociales", "démographie"],
-    "Droit et sciences politiques": ["droit", "juridique", "sciences politiques", "relations internationales"],
-    "Économie et gestion": ["économie", "gestion", "finance", "comptabilité", "management", "commerce"],
-    "Lettres et langues": ["littérature", "linguistique", "langue", "traduction", "lettres", "arabe", "français"],
-    "Sciences islamiques": ["islamique", "fiqh", "charia", "coran", "hadith", "sciences islamiques"],
-    "Arts et architecture": ["arts", "architecture", "urbanisme", "design", "beaux-arts"],
-    "Sciences de l'éducation": ["éducation", "pédagogie", "didactique", "formation", "enseignement"],
+    "Sciences exactes et naturelles": ["mathématique", "physique", "chimie", "biologie", "astronomie"],
+    "Sciences de la vie": ["médecine", "pharmacie", "vétérinaire", "santé", "biochimie"],
+    "Sciences de la terre": ["géologie", "géographie", "environnement", "hydraulique"],
+    "Sciences de l'ingénieur": ["génie", "électronique", "mécanique", "informatique", "technologie"],
+    "Sciences humaines": ["histoire", "philosophie", "archéologie", "patrimoine"],
+    "Sciences sociales": ["sociologie", "psychologie", "anthropologie", "démographie"],
+    "Droit et sciences politiques": ["droit", "juridique", "sciences politiques"],
+    "Économie et gestion": ["économie", "gestion", "finance", "comptabilité", "management"],
+    "Lettres et langues": ["littérature", "linguistique", "langue", "traduction", "lettres"],
+    "Sciences islamiques": ["islamique", "fiqh", "charia", "coran", "hadith"],
+    "Arts et architecture": ["arts", "architecture", "urbanisme", "design"],
+    "Sciences de l'éducation": ["éducation", "pédagogie", "didactique", "formation"],
 }
+
+APPEL_KEYWORDS = [
+    "appel à soumission", "appel à contribution", "call for paper",
+    "call for papers", "soumettre", "soumission en cours",
+    "numéro en cours", "accepte les soumissions", "dépôt des articles",
+    "submit", "submission", "appel à articles",
+]
+
+MOIS_FR = {
+    "janvier": 1, "février": 2, "mars": 3, "avril": 4,
+    "mai": 5, "juin": 6, "juillet": 7, "août": 8,
+    "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
+}
+
+DATE_FORMATS = ["%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%y"]
 
 
 def detect_domaine(texte: str) -> str:
@@ -34,130 +52,192 @@ def detect_domaine(texte: str) -> str:
     return "Autre"
 
 
+def parse_date(date_str: str) -> Optional[date]:
+    from datetime import datetime
+    # Remplacer mois français
+    date_str_lower = date_str.lower()
+    for mois, num in MOIS_FR.items():
+        date_str_lower = date_str_lower.replace(mois, str(num).zfill(2))
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(date_str_lower.strip(), fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def extract_date(texte: str) -> Optional[date]:
+    # Format JJ/MM/AAAA
+    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", texte)
+    if m:
+        try:
+            d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 2024 <= y <= 2028 and 1 <= mo <= 12 and 1 <= d <= 31:
+                return date(y, mo, d)
+        except Exception:
+            pass
+    # Format JJ mois AAAA
+    m = re.search(
+        r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})",
+        texte.lower()
+    )
+    if m:
+        try:
+            return date(int(m.group(3)), MOIS_FR[m.group(2)], int(m.group(1)))
+        except Exception:
+            pass
+    return None
+
+
 class ASJPScraper(BaseScraper):
     site_name = "ASJP"
     base_url = "https://www.asjp.cerist.dz"
+    timeout = 20
 
-    APPEL_KEYWORDS = [
-        "appel à soumission", "appel à contribution", "call for paper",
-        "soumettre", "soumission", "numéro en cours", "en cours de publication",
-        "accepte les soumissions", "dépôt des articles",
-    ]
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (compatible; UnivDZBot/1.0)"
+        })
 
-    def scrape(self) -> list[dict]:
-        revues = []
+    def fetch(self, url: str):
+        try:
+            resp = self.session.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            resp.encoding = resp.apparent_encoding
+            return BeautifulSoup(resp.text, "html.parser")
+        except Exception as e:
+            logger.warning(f"[ASJP] Erreur fetch {url}: {e}")
+            return None
 
-        # Page principale des revues
-        soup = self.fetch(f"{self.base_url}/en/revues")
+    def get_all_journals(self) -> List[Dict]:
+        """Récupérer tous les liens de revues — méthode Manus améliorée."""
+        journals = []
+        seen = set()
+
+        for path in ["/en/revues", "/Revues", "/ar/revues"]:
+            soup = self.fetch(self.base_url + path)
+            if not soup:
+                continue
+
+            # Méthode Manus : chercher /PresentationRevue/
+            for a in soup.find_all("a", href=re.compile(r"PresentationRevue/\d+")):
+                name = a.get_text(strip=True)
+                href = a.get("href", "")
+                url = href if href.startswith("http") else self.base_url + href
+                if url not in seen and name:
+                    seen.add(url)
+                    journals.append({"name": name, "url": url})
+
+            # Méthode alternative : chercher /revues/\d+
+            for a in soup.find_all("a", href=re.compile(r"/revues/\d+")):
+                name = a.get_text(strip=True)
+                href = a.get("href", "")
+                url = href if href.startswith("http") else self.base_url + href
+                if url not in seen and name:
+                    seen.add(url)
+                    journals.append({"name": name, "url": url})
+
+            time.sleep(1)
+
+        logger.info(f"[ASJP] {len(journals)} revues trouvées")
+        return journals
+
+    def get_calls_for_papers(self, journal: Dict) -> Optional[Dict]:
+        """Vérifier si une revue a un appel à soumission ouvert."""
+        soup = self.fetch(journal["url"])
         if not soup:
-            logger.warning("[ASJP] Impossible d'accéder à la page des revues")
-            return revues
-
-        # Chercher tous les liens de revues
-        liens_revues = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            if "/en/revues/" in href or "/ar/revues/" in href:
-                if href not in liens_revues:
-                    liens_revues.append(href)
-
-        logger.info(f"[ASJP] {len(liens_revues)} revues trouvées")
-
-        # Visiter chaque revue
-        for lien in liens_revues[:50]:  # Limiter à 50 pour ne pas surcharger
-            try:
-                url = lien if lien.startswith("http") else self.base_url + lien
-                revue_data = self._scrape_revue(url)
-                if revue_data:
-                    revues.append(revue_data)
-            except Exception as e:
-                logger.error(f"[ASJP] Erreur revue {lien}: {e}")
-
-        logger.info(f"[ASJP] {len(revues)} revues avec appel à soumission")
-        return revues
-
-    def _scrape_revue(self, url: str) -> dict | None:
-        soup = self.fetch(url)
-        if not soup:
             return None
 
-        # Nom de la revue
-        nom_tag = soup.find("h1") or soup.find("h2") or soup.find(class_=re.compile(r"title|nom|name"))
-        if not nom_tag:
-            return None
-        nom = nom_tag.get_text(strip=True)
-        if len(nom) < 5:
-            return None
+        page_text = soup.get_text(separator=" ").lower()
 
-        # Vérifier s'il y a un appel à soumission
-        page_text = soup.get_text().lower()
-        has_appel = any(kw in page_text for kw in self.APPEL_KEYWORDS)
+        # Vérifier appel ouvert
+        has_appel = any(kw in page_text for kw in APPEL_KEYWORDS)
+
+        # Méthode Manus : chercher lien callForPapers
+        call_links = soup.find_all("a", href=re.compile(r"callForPapers|Appel", re.IGNORECASE))
+        if call_links:
+            has_appel = True
+
         if not has_appel:
             return None
 
-        # Description / résumé
+        # Nom de la revue
+        nom = journal["name"]
+        if not nom:
+            h = soup.find("h1") or soup.find("h2")
+            nom = h.get_text(strip=True) if h else "Revue sans nom"
+
+        # Description
         description = ""
-        desc_tag = soup.find(class_=re.compile(r"description|about|resume|summary"))
-        if desc_tag:
-            description = desc_tag.get_text(strip=True)[:500]
+        for cls in ["description", "about", "resume", "presentation"]:
+            tag = soup.find(class_=re.compile(cls, re.I))
+            if tag:
+                description = tag.get_text(strip=True)[:500]
+                break
 
-        # Université / institution
+        # Université
         universite = ""
-        univ_tag = soup.find(string=re.compile(r"université|institution|établissement", re.I))
-        if univ_tag and univ_tag.parent:
-            universite = univ_tag.parent.get_text(strip=True)[:200]
+        m = re.search(r"(université[^,\n]{5,60}|univ\.[^,\n]{5,40})", page_text, re.I)
+        if m:
+            universite = m.group(0).strip()[:200]
 
-        # Détecter le domaine
-        domaine = detect_domaine(nom + " " + description)
+        # Date limite
+        date_limite = extract_date(page_text)
 
-        # Date limite si mentionnée
-        date_limite = None
-        date_match = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", page_text)
-        if date_match:
-            try:
-                from datetime import date
-                d, m, y = int(date_match.group(1)), int(date_match.group(2)), int(date_match.group(3))
-                if 2024 <= y <= 2027:
-                    date_limite = date(y, m, d)
-            except Exception:
-                pass
+        # ISSN
+        issn = ""
+        m = re.search(r"(?:e?issn|issn)[:\s]*([\d\-Xx]{4,12})", page_text, re.I)
+        if m:
+            issn = m.group(1).strip()
 
         return {
             "nom": nom[:500],
-            "domaine": domaine,
+            "domaine": detect_domaine(nom + " " + description),
             "description": description,
-            "universite": universite[:300],
-            "lien_asjp": url,
-            "lien_officiel": url,
+            "universite": universite,
+            "lien_asjp": journal["url"],
+            "lien_officiel": journal["url"],
             "date_limite": date_limite,
             "statut_appel": "ouvert",
             "source": "ASJP",
         }
 
+    def scrape(self) -> List[Dict]:
+        revues = []
+        journals = self.get_all_journals()
+
+        for i, journal in enumerate(journals[:80]):
+            try:
+                result = self.get_calls_for_papers(journal)
+                if result:
+                    revues.append(result)
+                    logger.info(f"[ASJP] ✅ {result['nom'][:50]}")
+                if i % 10 == 0:
+                    time.sleep(2)
+            except Exception as e:
+                logger.error(f"[ASJP] Erreur {journal['url']}: {e}")
+
+        logger.info(f"[ASJP] {len(revues)} revues avec appel ouvert")
+        return revues
+
     def run_revues(self, app) -> int:
-        """Version spéciale pour sauvegarder des Revue et non des Event."""
         from app import db
         from app.models.event import Revue
         from slugify import slugify
 
         count = 0
         with app.app_context():
-            raw_list = self.scrape()
-            for raw in raw_list:
+            for raw in self.scrape():
                 try:
-                    # Vérifier doublon
-                    exists = Revue.query.filter_by(lien_asjp=raw.get("lien_asjp")).first()
-                    if exists:
+                    if Revue.query.filter_by(lien_asjp=raw.get("lien_asjp")).first():
                         continue
-
-                    # Générer slug unique
                     base_slug = slugify(raw["nom"][:80], separator="-")
                     slug = base_slug
                     counter = 1
                     while Revue.query.filter_by(slug=slug).first():
                         slug = f"{base_slug}-{counter}"
                         counter += 1
-
                     revue = Revue(
                         nom=raw["nom"],
                         domaine=raw.get("domaine", "Autre"),
@@ -166,7 +246,7 @@ class ASJPScraper(BaseScraper):
                         lien_asjp=raw.get("lien_asjp", ""),
                         lien_officiel=raw.get("lien_officiel", ""),
                         date_limite=raw.get("date_limite"),
-                        statut_appel=raw.get("statut_appel", "ouvert"),
+                        statut_appel="ouvert",
                         source="ASJP",
                         date_collecte=datetime.utcnow(),
                         statut="a_verifier",
