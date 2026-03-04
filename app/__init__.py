@@ -38,5 +38,17 @@ def create_app(config_name="default"):
 
     with app.app_context():
         db.create_all()
+        _create_admin()
 
     return app
+
+def _create_admin():
+    import os
+    from app.models.event import Admin
+    admin_username = os.environ.get("ADMIN_USERNAME", "admin")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    if not Admin.query.filter_by(username=admin_username).first():
+        admin = Admin(username=admin_username)
+        admin.set_password(admin_password)
+        db.session.add(admin)
+        db.session.commit()
