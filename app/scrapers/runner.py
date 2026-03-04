@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.scrapers.universities import USThBScraper, UniOran1Scraper, UniConstantine1Scraper, GenericUnivScraper
 from app.scrapers.mesrs import MESRSScraper
 
@@ -25,38 +26,51 @@ SCRAPERS = [
 ]
 
 
+def run_scraper(scraper, app):
+    """Lancer un scraper individuel — utilisé par le thread pool."""
+    try:
+        count = scraper.run(app)
+        logger.info(f"[Runner] ✅ {scraper.site_name}: {count} événements")
+        return count
+    except Exception as e:
+        logger.error(f"[Runner] ❌ Erreur {scraper.site_name}: {e}")
+        return 0
+
+
 def run_all_scrapers(app=None) -> int:
     from flask import current_app
     _app = app or current_app._get_current_object()
     total = 0
 
-    # Scrapers universités
-    for scraper in SCRAPERS:
-        try:
-            count = scraper.run(_app)
-            total += count
-            logger.info(f"[Runner] {scraper.site_name}: {count} événements")
-        except Exception as e:
-            logger.error(f"[Runner] Erreur {scraper.site_name}: {e}")
+    logger.info(f"[Runner] 🚀 Lancement multithreading — {len(SCRAPERS)} universités en parallèle...")
 
-    # Scraper MESRS — bourses uniquement
+    # ─── Scrapers universités en parallèle ────────────────────
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {
+            executor.submit(run_scraper, scraper, _app): scraper.site_name
+            for scraper in SCRAPERS
+        }
+        for future in as_completed(futures):
+            total += future.result()
+
+    # ─── Scraper MESRS — bourses uniquement ───────────────────
     try:
         mesrs = MESRSScraper()
         count = mesrs.run(_app)
         total += count
-        logger.info(f"[Runner] MESRS: {count} bourses")
+        logger.info(f"[Runner] ✅ MESRS: {count} bourses")
     except Exception as e:
-        logger.error(f"[Runner] Erreur MESRS: {e}")
+        logger.error(f"[Runner] ❌ Erreur MESRS: {e}")
 
-    # Scraper ASJP — revues scientifiques
+    # ─── Scraper ASJP — revues scientifiques ──────────────────
     try:
         from app.scrapers.asjp import ASJPScraper
         asjp = ASJPScraper()
         count = asjp.run_revues(_app)
         total += count
-        logger.info(f"[Runner] ASJP: {count} revues")
+        logger.info(f"[Runner] ✅ ASJP: {count} revues")
     except Exception as e:
-        logger.error(f"[Runner] Erreur ASJP: {e}")
+        logger.error(f"[Runner] ❌ Erreur ASJP: {e}")
 
-    logger.info(f"[Runner] Total collecté: {total}")
+    logger.info(f"[Runner] 🏁 Total collecté: {total}")
     return total
