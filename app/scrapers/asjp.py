@@ -78,6 +78,7 @@ def extract_date(texte: str) -> Optional[date]:
                 return date(y, mo, d)
         except Exception:
             pass
+
     m = re.search(
         r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})",
         texte.lower()
@@ -87,6 +88,7 @@ def extract_date(texte: str) -> Optional[date]:
             return date(int(m.group(3)), MOIS_FR[m.group(2)], int(m.group(1)))
         except Exception:
             pass
+
     return None
 
 
@@ -175,6 +177,10 @@ class ASJPScraper(BaseScraper):
 
         date_limite = extract_date(page_text)
 
+        # 🔴 filtrage des appels expirés
+        if date_limite and date_limite < date.today():
+            return None
+
         return {
             "nom": nom[:500],
             "domaine": detect_domaine(nom + " " + description),
@@ -191,7 +197,6 @@ class ASJPScraper(BaseScraper):
         revues = []
         journals = self.get_all_journals()
 
-        # Limité à 20 revues pour respecter la mémoire plan gratuit Render
         for i, journal in enumerate(journals[:20]):
             try:
                 result = self.get_calls_for_papers(journal)
@@ -212,17 +217,24 @@ class ASJPScraper(BaseScraper):
         from slugify import slugify
 
         count = 0
+
         with app.app_context():
+
             for raw in self.scrape():
+
                 try:
+
                     if Revue.query.filter_by(lien_asjp=raw.get("lien_asjp")).first():
                         continue
+
                     base_slug = slugify(raw["nom"][:80], separator="-")
                     slug = base_slug
                     counter = 1
+
                     while Revue.query.filter_by(slug=slug).first():
                         slug = f"{base_slug}-{counter}"
                         counter += 1
+
                     revue = Revue(
                         nom=raw["nom"],
                         domaine=raw.get("domaine", "Autre"),
@@ -237,10 +249,14 @@ class ASJPScraper(BaseScraper):
                         statut="a_verifier",
                         slug=slug,
                     )
+
                     db.session.add(revue)
                     count += 1
+
                 except Exception as e:
                     logger.error(f"[ASJP] Erreur sauvegarde: {e}")
                     db.session.rollback()
+
             db.session.commit()
+
         return count
