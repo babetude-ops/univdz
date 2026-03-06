@@ -4,26 +4,45 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db, login_manager
 
 
+# ────────────────────────────────────────────────
+#  Modèle Event
+# ────────────────────────────────────────────────
+
 class Event(db.Model):
     __tablename__ = "events"
 
     id = db.Column(db.Integer, primary_key=True)
+
     titre = db.Column(db.String(500), nullable=False)
     type = db.Column(db.String(100), nullable=False)
+
     universite = db.Column(db.String(300))
     discipline = db.Column(db.String(200))
     wilaya = db.Column(db.String(100))
+
     date_debut = db.Column(db.Date)
     date_fin = db.Column(db.Date)
     date_limite = db.Column(db.Date)
+
     description = db.Column(db.Text)
     lien_officiel = db.Column(db.String(1000))
+
     source = db.Column(db.String(500))
+
     date_collecte = db.Column(db.DateTime, default=datetime.utcnow)
-    score_fiabilite = db.Column(db.Float, default=0.5)
+
+    score_fiabilite = db.Column(db.Float, default=0.7)
+
+    # validation automatique
     statut = db.Column(db.String(50), default="valide")
-    date_validation = db.Column(db.DateTime)
+
+    date_validation = db.Column(
+        db.DateTime,
+        default=datetime.utcnow
+    )
+
     validated_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
+
     slug = db.Column(db.String(600), unique=True)
 
     def __repr__(self):
@@ -49,17 +68,29 @@ class Event(db.Model):
         }
 
 
+# ────────────────────────────────────────────────
+#  Modèle Admin
+# ────────────────────────────────────────────────
+
 class Admin(UserMixin, db.Model):
     __tablename__ = "admins"
 
     id = db.Column(db.Integer, primary_key=True)
+
     username = db.Column(db.String(100), unique=True, nullable=False)
     email = db.Column(db.String(200), unique=True, nullable=False)
+
     password_hash = db.Column(db.String(256), nullable=False)
+
     is_superadmin = db.Column(db.Boolean, default=False)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    validated_events = db.relationship("Event", backref="validator", lazy="dynamic")
+    validated_events = db.relationship(
+        "Event",
+        backref="validator",
+        lazy="dynamic"
+    )
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -74,27 +105,44 @@ class Admin(UserMixin, db.Model):
 @login_manager.user_loader
 def load_user(user_id):
     return Admin.query.get(int(user_id))
+
+
 # ────────────────────────────────────────────────
-#  Modèle Revue
+#  Modèle Revue (ASJP)
 # ────────────────────────────────────────────────
+
 class Revue(db.Model):
     __tablename__ = "revues"
 
     id = db.Column(db.Integer, primary_key=True)
+
     nom = db.Column(db.String(500), nullable=False)
+
     domaine = db.Column(db.String(200))
     sous_domaine = db.Column(db.String(200))
+
     universite = db.Column(db.String(300))
+
     description = db.Column(db.Text)
+
     lien_officiel = db.Column(db.String(1000))
     lien_asjp = db.Column(db.String(1000))
+
     date_limite = db.Column(db.Date)
+
     annee_volume = db.Column(db.String(50))
+
     statut_appel = db.Column(db.String(100), default="ouvert")
+
     source = db.Column(db.String(500), default="ASJP")
+
     date_collecte = db.Column(db.DateTime, default=datetime.utcnow)
+
     score_fiabilite = db.Column(db.Float, default=0.8)
-    statut = db.Column(db.String(50), default="a_verifier")
+
+    # validation automatique
+    statut = db.Column(db.String(50), default="valide")
+
     slug = db.Column(db.String(600), unique=True)
 
     def __repr__(self):
