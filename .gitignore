@@ -2,8 +2,14 @@ __pycache__/
 *.py[cod]
 venv/
 .env
+
+# ignore databases
 *.db
 *.sqlite
+
+# BUT keep this database
+!univdz.db
+
 *.log
 .DS_Store
 instance/
