@@ -1,10 +1,14 @@
 import logging
 from abc import ABC, abstractmethod
 import requests
+from urllib3.exceptions import InsecureRequestWarning
 from bs4 import BeautifulSoup
 from app import db
 from app.models.event import Event
 from app.utils.normalizer import normalize_event, generate_slug
+
+# Désactiver les warnings SSL
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +27,7 @@ class BaseScraper(ABC):
 
     def fetch(self, url: str):
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=self.timeout)
+            resp = requests.get(url, headers=HEADERS, timeout=self.timeout, verify=False)
             resp.raise_for_status()
             resp.encoding = resp.apparent_encoding
             return BeautifulSoup(resp.text, "html.parser")
