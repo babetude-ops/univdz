@@ -1,1 +1,1 @@
-from app.scrapers.runner import run_all_scrapers
+# scrapers package
