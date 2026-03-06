@@ -13,19 +13,22 @@ scheduler = BackgroundScheduler()
 def create_app(config_name="default"):
     app = Flask(__name__)
 
+    # Charger la configuration
     from config.settings import config
     app.config.from_object(config[config_name])
 
-    # ─── Fix connexion PostgreSQL intermittente ────────────────
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_pre_ping": True,        # Vérifier la connexion avant chaque requête
-        "pool_recycle": 300,          # Recycler les connexions toutes les 5 min
-        "pool_timeout": 30,           # Timeout de 30s
-        "connect_args": {
-            "connect_timeout": 10,
-        },
-    }
+    # ─── Options SQLAlchemy seulement pour PostgreSQL ─────────
+    if "postgres" in app.config["SQLALCHEMY_DATABASE_URI"]:
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+            "pool_timeout": 30,
+            "connect_args": {
+                "connect_timeout": 10,
+            },
+        }
 
+    # Initialisation des extensions
     db.init_app(app)
     migrate.init_app(app, db)
 
@@ -33,6 +36,7 @@ def create_app(config_name="default"):
     login_manager.login_view = "admin.login"
     login_manager.login_message = "Veuillez vous connecter pour accéder à cette page."
 
+    # Import des routes
     from app.routes.main import main_bp
     from app.routes.admin import admin_bp
     from app.routes.api import api_bp
@@ -41,11 +45,13 @@ def create_app(config_name="default"):
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(api_bp, url_prefix="/api")
 
+    # Scheduler (scraping automatique)
     if not scheduler.running:
         from app.scrapers.scheduler import schedule_jobs
         schedule_jobs(scheduler, app)
         scheduler.start()
 
+    # Création des tables + admin
     with app.app_context():
         db.create_all()
         _create_admin()
@@ -56,10 +62,14 @@ def create_app(config_name="default"):
 def _create_admin():
     import os
     from app.models.event import Admin
+
     admin_username = os.environ.get("ADMIN_USERNAME", "admin")
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@univdz.dz")
+
     if not Admin.query.filter_by(username=admin_username).first():
-        admin = Admin(username=admin_username, email=os.environ.get("ADMIN_EMAIL", "admin@univdz.dz"))
+        admin = Admin(username=admin_username, email=admin_email)
         admin.set_password(admin_password)
+
         db.session.add(admin)
         db.session.commit()

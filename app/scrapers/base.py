@@ -27,7 +27,12 @@ class BaseScraper(ABC):
 
     def fetch(self, url: str):
         try:
-            resp = requests.get(url, headers=HEADERS, timeout=self.timeout, verify=False)
+            resp = requests.get(
+                url,
+                headers=HEADERS,
+                timeout=self.timeout,
+                verify=False
+            )
             resp.raise_for_status()
             resp.encoding = resp.apparent_encoding
             return BeautifulSoup(resp.text, "html.parser")
@@ -41,28 +46,59 @@ class BaseScraper(ABC):
 
     def run(self, app) -> int:
         count = 0
+
         with app.app_context():
+
             raw_events = self.scrape()
+
             for raw in raw_events:
+
                 try:
+
                     event_data = normalize_event(raw, source=self.site_name)
+
+                    # 🔥 VALIDATION AUTOMATIQUE
+                    event_data["statut"] = "valide"
+
                     if self._is_duplicate(event_data):
                         continue
+
                     event = Event(**event_data)
-                    event.slug = generate_slug(event_data["titre"], event_data.get("date_debut"))
+
+                    event.slug = generate_slug(
+                        event_data["titre"],
+                        event_data.get("date_debut")
+                    )
+
                     db.session.add(event)
+
                     count += 1
+
                 except Exception as e:
                     logger.error(f"[{self.site_name}] Erreur sauvegarde: {e}")
                     db.session.rollback()
+
             db.session.commit()
+
         return count
 
     def _is_duplicate(self, event_data: dict) -> bool:
+
         if event_data.get("lien_officiel"):
-            if Event.query.filter_by(lien_officiel=event_data["lien_officiel"]).first():
+
+            if Event.query.filter_by(
+                lien_officiel=event_data["lien_officiel"]
+            ).first():
+
                 return True
+
         if event_data.get("titre") and event_data.get("source"):
-            if Event.query.filter_by(titre=event_data["titre"], source=event_data["source"]).first():
+
+            if Event.query.filter_by(
+                titre=event_data["titre"],
+                source=event_data["source"]
+            ).first():
+
                 return True
+
         return False

@@ -1,198 +1,166 @@
 import logging
-import re
-from datetime import date
 from app.scrapers.base import BaseScraper
+from app.utils.ai_classifier import classify_event
 
 logger = logging.getLogger(__name__)
 
-NEWS_PATHS = [
-    "/actualites",
-    "/fr/actualites",
-    "/index.php/actualites",
-    "/fr/index.php/actualites",
-    "/actualite",
-    "/news",
-    "/fr/news",
-    "/evenements",
-    "/fr/evenements",
-    "/manifestations-scientifiques",
-    "/fr/manifestations-scientifiques",
-    "/activites-scientifiques",
-    "/appels",
-    "/bourses",
-]
-
-BOURSE_KEYWORDS = [
-    "bourse", "scholarship", "fellowship", "erasmus", "mobilité",
-    "appel à candidature", "programme de bourse", "financement"
-]
-
 EVENT_KEYWORDS = [
-    "colloque", "séminaire", "conférence", "journée", "atelier",
-    "workshop", "appel à communication", "manifestation", "symposium"
+    "colloque",
+    "séminaire",
+    "seminaire",
+    "conference",
+    "conférence",
+    "workshop",
+    "appel",
+    "communication",
+    "bourse",
+    "scholarship",
+    "erasmus",
+    "mobilité",
+    "manifestation",
+    "symposium"
 ]
 
 
-def parse_date(text):
-    m = re.search(r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", text)
-    if m:
-        try:
-            d = int(m.group(1))
-            mth = int(m.group(2))
-            y = int(m.group(3))
-            return date(y, mth, d)
-        except:
-            return None
-    return None
+class SmartUnivScraper(BaseScraper):
 
-
-class GenericUnivScraper(BaseScraper):
-
-    def __init__(self, site_name, base_url, news_path, universite, wilaya):
+    def __init__(self, site_name, base_url, universite, wilaya):
         self.site_name = site_name
         self.base_url = base_url.rstrip("/")
-        self.news_path = news_path
         self.universite = universite
         self.wilaya = wilaya
 
     def scrape(self) -> list[dict]:
 
         results = []
+        seen = set()
 
-        url = self.base_url + self.news_path
-
-        soup = self.fetch(url)
+        soup = self.fetch(self.base_url)
 
         if not soup:
             return []
 
-        links = soup.find_all("a", href=True)
+        candidate_pages = []
 
-        seen = set()
+        # détecter pages événements
+        for a in soup.find_all("a", href=True):
 
-        for link in links:
+            text = a.get_text(strip=True).lower()
+            href = a["href"]
 
-            titre = link.get_text(strip=True)
+            if any(k in text for k in EVENT_KEYWORDS):
 
-            href = link["href"]
+                if href.startswith("http"):
+                    link = href
+                elif href.startswith("/"):
+                    link = self.base_url + href
+                else:
+                    link = self.base_url + "/" + href
 
-            if not titre or len(titre) < 10 or len(titre) > 400:
+                candidate_pages.append(link)
+
+        logger.info(f"[{self.site_name}] pages détectées: {len(candidate_pages)}")
+
+        for page in candidate_pages[:5]:
+
+            page_soup = self.fetch(page)
+
+            if not page_soup:
                 continue
 
-            if len(titre) > 200:
-                continue
+            for link in page_soup.find_all("a", href=True):
 
-            titre_lower = titre.lower()
+                href = link["href"]
 
-            is_relevant = any(
-                kw in titre_lower for kw in BOURSE_KEYWORDS + EVENT_KEYWORDS
-            )
+                # détecter documents scientifiques
+                if href.endswith(".pdf") or href.endswith(".doc") or href.endswith(".docx"):
+                    titre = link.get_text(strip=True) or href
+                else:
+                    titre = link.get_text(strip=True)
 
-            if not is_relevant:
-                continue
+                if not titre or len(titre) < 10 or len(titre) > 300:
+                    continue
 
-            if titre in seen:
-                continue
+                if titre in seen:
+                    continue
 
-            seen.add(titre)
+                seen.add(titre)
 
-            # filtrage des dates passées
-            event_date = parse_date(titre)
+                titre_lower = titre.lower()
 
-            if event_date and event_date < date.today():
-                continue
+                # filtrage avant IA
+                if not any(k in titre_lower for k in EVENT_KEYWORDS):
+                    continue
 
-            if href.startswith("http"):
-                lien = href
-            elif href.startswith("/"):
-                lien = self.base_url + href
-            else:
-                lien = self.base_url + "/" + href
+                # classification IA
+                type_event = classify_event(titre)
 
-            results.append({
-                "titre": titre,
-                "institution": self.universite,
-                "wilaya": self.wilaya,
-                "lien_officiel": lien,
-                "source_url": url,
-            })
+                if href.startswith("http"):
+                    lien = href
+                elif href.startswith("/"):
+                    lien = self.base_url + href
+                else:
+                    lien = self.base_url + "/" + href
+
+                results.append({
+                    "titre": titre,
+                    "type": type_event,
+                    "institution": self.universite,
+                    "wilaya": self.wilaya,
+                    "lien_officiel": lien,
+                    "source_url": page,
+                })
 
         logger.info(f"[{self.site_name}] {len(results)} résultats trouvés")
 
         return results
 
 
-class SmartUnivScraper(GenericUnivScraper):
-
-    def __init__(self, site_name, base_url, universite, wilaya, preferred_path=None):
-        self.site_name = site_name
-        self.base_url = base_url.rstrip("/")
-        self.universite = universite
-        self.wilaya = wilaya
-        self.news_path = preferred_path or "/actualites"
-
-    def scrape(self) -> list[dict]:
-
-        paths_to_try = [self.news_path] + [p for p in NEWS_PATHS if p != self.news_path]
-
-        for path in paths_to_try:
-
-            url = self.base_url + path
-
-            soup = self.fetch(url)
-
-            if soup:
-
-                self.news_path = path
-
-                logger.info(f"[{self.site_name}] URL trouvée: {url}")
-
-                return super().scrape()
-
-        logger.warning(f"[{self.site_name}] Aucun chemin valide trouvé")
-
-        return []
-
-
 def get_all_scrapers():
 
     universities = [
 
-        ("Université d'Alger 1 Benyoucef Benkhedda", "https://www.univ-alger.dz", "Alger"),
-        ("Université d'Alger 2 Abou El Kacem Saadallah", "https://www.univ-alger2.dz", "Alger"),
-        ("Université d'Alger 3 Ibrahim Sultan Cheibout", "https://www.univ-alger3.dz", "Alger"),
+        ("Université d'Alger 1", "https://www.univ-alger.dz", "Alger"),
+        ("Université d'Alger 2", "https://www.univ-alger2.dz", "Alger"),
+        ("Université d'Alger 3", "https://www.univ-alger3.dz", "Alger"),
         ("USTHB", "https://www.usthb.dz", "Alger"),
-        ("École Nationale Polytechnique", "https://www.enp.edu.dz", "Alger"),
         ("ESI Alger", "https://www.esi.dz", "Alger"),
 
-        ("Université d'Oran 1 Ahmed Ben Bella", "https://www.univ-oran1.dz", "Oran"),
-        ("Université d'Oran 2 Mohamed Ben Ahmed", "https://www.univ-oran2.dz", "Oran"),
+        ("Université Oran 1", "https://www.univ-oran1.dz", "Oran"),
+        ("Université Oran 2", "https://www.univ-oran2.dz", "Oran"),
 
-        ("Université de Mostaganem Abdelhamid Ibn Badis", "https://www.univ-mosta.dz", "Mostaganem"),
+        ("Université Mostaganem", "https://www.univ-mosta.dz", "Mostaganem"),
+        ("Université Tlemcen", "https://www.univ-tlemcen.dz", "Tlemcen"),
+        ("Université Sidi Bel Abbes", "https://www.univ-sba.dz", "Sidi Bel Abbes"),
 
-        ("Université de Tlemcen Abou Bekr Belkaid", "https://www.univ-tlemcen.dz", "Tlemcen"),
+        ("Université Béjaïa", "https://www.univ-bejaia.dz", "Bejaia"),
+        ("Université Tizi Ouzou", "https://www.ummto.dz", "Tizi Ouzou"),
 
-        ("Université de Béjaïa Abderrahmane Mira", "https://www.univ-bejaia.dz", "Béjaïa"),
+        ("Université Sétif 1", "https://www.univ-setif.dz", "Setif"),
+        ("Université Sétif 2", "https://www.univ-setif2.dz", "Setif"),
 
-        ("Université de Tizi Ouzou Mouloud Mammeri", "https://www.ummto.dz", "Tizi Ouzou"),
+        ("Université Constantine 1", "https://www.umc.edu.dz", "Constantine"),
+        ("Université Constantine 2", "https://www.univ-constantine2.dz", "Constantine"),
 
-        ("Université de Sétif 1 Ferhat Abbas", "https://www.univ-setif.dz", "Sétif"),
+        ("Université Annaba", "https://www.univ-annaba.dz", "Annaba"),
+        ("Université Guelma", "https://www.univ-guelma.dz", "Guelma"),
+        ("Université Skikda", "https://www.univ-skikda.dz", "Skikda"),
 
-        ("Université Constantine 1 Frères Mentouri", "https://www.umc.edu.dz", "Constantine"),
+        ("Université Batna 1", "https://www.univ-batna.dz", "Batna"),
+        ("Université Batna 2", "https://www.univ-batna2.dz", "Batna"),
 
-        ("Université d'Annaba Badji Mokhtar", "https://www.univ-annaba.dz", "Annaba"),
+        ("Université Biskra", "https://www.univ-biskra.dz", "Biskra"),
+        ("Université Djelfa", "https://www.univ-djelfa.dz", "Djelfa"),
 
-        ("Université de Batna 1 Hadj Lakhdar", "https://www.univ-batna.dz", "Batna"),
+        ("Université Laghouat", "https://www.lagh-univ.dz", "Laghouat"),
+        ("Université Ouargla", "https://www.univ-ouargla.dz", "Ouargla"),
 
-        ("Université de Biskra Mohamed Khider", "https://www.univ-biskra.dz", "Biskra"),
+        ("Université Adrar", "http://www.univ-adrar.dz", "Adrar"),
+        ("Université El Oued", "https://www.univ-eloued.dz", "El Oued"),
 
-        ("Université de Laghouat Amar Telidji", "https://www.lagh-univ.dz", "Laghouat"),
-
-        ("Université de Ouargla Kasdi Merbah", "https://www.univ-ouargla.dz", "Ouargla"),
-
-        ("Université d'Adrar Ahmed Draia", "http://www.univ-adrar.dz", "Adrar"),
-
-        ("Université d'El Oued Hamma Lakhdar", "https://www.univ-eloued.dz", "El Oued"),
+        ("Université Souk Ahras", "https://www.univ-soukahras.dz", "Souk Ahras"),
+        ("Université Tebessa", "https://www.univ-tebessa.dz", "Tebessa"),
+        ("Université Oum El Bouaghi", "https://www.univ-oeb.dz", "Oum El Bouaghi"),
 
     ]
 
@@ -210,52 +178,3 @@ def get_all_scrapers():
         )
 
     return scrapers
-
-
-class BejaiaSpecificScraper(GenericUnivScraper):
-
-    def __init__(self):
-
-        super().__init__(
-            site_name="Université de Béjaïa",
-            base_url="https://www.univ-bejaia.dz",
-            news_path="/vrrelex/fr/actualites",
-            universite="Université Abderrahmane Mira de Béjaïa",
-            wilaya="Béjaïa"
-        )
-
-
-class USThBScraper(SmartUnivScraper):
-
-    def __init__(self):
-
-        super().__init__(
-            site_name="USTHB",
-            base_url="https://www.usthb.dz",
-            universite="Université des Sciences et de la Technologie Houari Boumediene",
-            wilaya="Alger",
-        )
-
-
-class UniOran1Scraper(SmartUnivScraper):
-
-    def __init__(self):
-
-        super().__init__(
-            site_name="Université Oran 1",
-            base_url="https://www.univ-oran1.dz",
-            universite="Université d'Oran 1 Ahmed Ben Bella",
-            wilaya="Oran",
-        )
-
-
-class UniConstantine1Scraper(SmartUnivScraper):
-
-    def __init__(self):
-
-        super().__init__(
-            site_name="Université Constantine 1",
-            base_url="https://www.umc.edu.dz",
-            universite="Université Frères Mentouri Constantine 1",
-            wilaya="Constantine",
-        )
