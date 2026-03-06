@@ -1,107 +1,141 @@
 import logging
 from urllib.parse import urljoin
-from bs4 import BeautifulSoup
-from .base import BaseScraper
+from app.scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
-
-KEYWORDS = [
-    "actualite",
-    "actualites",
-    "news",
-    "evenement",
-    "evenements",
-    "manifestation",
-    "colloque",
-    "seminaire",
+BOURSE_KEYWORDS = [
+    "bourse",
+    "bourses",
     "appel",
-    "bourse"
+    "appel à candidature",
+    "appel a candidature",
+]
+
+EVENT_KEYWORDS = [
+    "colloque",
+    "séminaire",
+    "seminaire",
+    "conférence",
+    "conference",
+    "manifestation",
+    "journée",
+    "journee",
 ]
 
 
-class UniversitiesScraper(BaseScraper):
+class UniversityScraper(BaseScraper):
 
-    site_name = "Universités Algériennes"
-
-    universities = [
-        ("Université Alger 1", "https://www.univ-alger.dz"),
-        ("Université Alger 2", "https://www.univ-alger2.dz"),
-        ("Université Alger 3", "https://www.univ-alger3.dz"),
-        ("USTHB", "https://www.usthb.dz"),
-        ("Université Oran 1", "https://www.univ-oran1.dz"),
-        ("Université Constantine 1", "https://www.umc.edu.dz"),
-        ("Université Batna 1", "https://www.univ-batna.dz"),
-        ("Université Biskra", "https://www.univ-biskra.dz"),
-        ("Université Bejaia", "https://www.univ-bejaia.dz"),
-        ("Université Mostaganem", "https://www.univ-mosta.dz"),
-        ("Université Setif 1", "https://www.univ-setif.dz"),
-        ("Université Laghouat", "https://www.lagh-univ.dz"),
-    ]
+    universite = ""
+    wilaya = ""
 
     def scrape(self):
 
-        events = []
+        results = []
+        seen = set()
 
-        for name, base_url in self.universities:
+        soup = self.fetch(self.base_url)
 
-            logger.info(f"Scraping {name}")
+        if not soup:
+            return []
 
-            soup = self.fetch(base_url)
+        candidate_pages = []
 
-            if not soup:
+        # détecter pages importantes
+        for a in soup.find_all("a", href=True):
+
+            text = a.get_text(strip=True).lower()
+
+            if any(k in text for k in [
+                "actualité",
+                "actualite",
+                "news",
+                "événement",
+                "evenement",
+                "manifestation",
+                "colloque",
+                "séminaire",
+                "appel",
+                "bourse"
+            ]):
+
+                link = urljoin(self.base_url, a["href"])
+                candidate_pages.append(link)
+
+        candidate_pages = list(set(candidate_pages))[:5]
+
+        logger.info(f"[{self.site_name}] pages détectées: {len(candidate_pages)}")
+
+        for page in candidate_pages:
+
+            page_soup = self.fetch(page)
+
+            if not page_soup:
                 continue
 
-            links = self.detect_news_links(soup, base_url)
+            for link in page_soup.find_all("a", href=True):
 
-            for url in links:
+                titre = link.get_text(strip=True)
 
-                page = self.fetch(url)
-
-                if not page:
+                if not titre or len(titre) < 10:
                     continue
 
-                items = page.select("a")
+                titre_lower = titre.lower()
 
-                for a in items:
+                if not any(k in titre_lower for k in BOURSE_KEYWORDS + EVENT_KEYWORDS):
+                    continue
 
-                    title = a.get_text(strip=True)
+                if titre in seen:
+                    continue
 
-                    if len(title) < 20:
-                        continue
+                seen.add(titre)
 
-                    link = a.get("href")
+                lien = urljoin(self.base_url, link["href"])
 
-                    if not link:
-                        continue
+                results.append({
+                    "titre": titre,
+                    "institution": self.universite,
+                    "wilaya": self.wilaya,
+                    "lien_officiel": lien,
+                    "source_url": page,
+                })
 
-                    link = urljoin(base_url, link)
+        logger.info(f"[{self.site_name}] {len(results)} résultats trouvés")
 
-                    events.append({
-                        "titre": title,
-                        "lien_officiel": link,
-                        "source": name
-                    })
+        return results
 
-        return events
 
-    def detect_news_links(self, soup: BeautifulSoup, base_url):
+# universités test
+UNIVERSITIES = [
 
-        links = []
+    ("Université Alger 1", "https://www.univ-alger.dz", "Alger"),
+    ("Université Alger 2", "https://www.univ-alger2.dz", "Alger"),
+    ("Université Alger 3", "https://www.univ-alger3.dz", "Alger"),
+    ("USTHB", "https://www.usthb.dz", "Alger"),
+    ("ESI Alger", "https://www.esi.dz", "Alger"),
 
-        for a in soup.select("a"):
+    ("Université Oran 1", "https://www.univ-oran1.dz", "Oran"),
+    ("Université Mostaganem", "https://www.univ-mosta.dz", "Mostaganem"),
+    ("Université Bejaia", "https://www.univ-bejaia.dz", "Bejaia"),
 
-            href = a.get("href")
+    ("Université Setif 1", "https://www.univ-setif.dz", "Setif"),
+    ("Université Constantine 1", "https://www.umc.edu.dz", "Constantine"),
+]
 
-            if not href:
-                continue
 
-            href_lower = href.lower()
+def get_all_scrapers():
 
-            for keyword in KEYWORDS:
+    scrapers = []
 
-                if keyword in href_lower:
+    for name, url, wilaya in UNIVERSITIES:
 
-                    links.append(urljoin(base_url, href))
+        scraper = UniversityScraper()
 
-        return list(set(links))
+        scraper.site_name = name
+        scraper.base_url = url
+        scraper.universite = name
+        scraper.wilaya = wilaya
+
+        scrapers.append(scraper)
+
+    return scrapers
