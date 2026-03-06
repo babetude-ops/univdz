@@ -1,0 +1,11 @@
+import zipfile
+import shutil
+import os
+
+zip_path = "univdz_refactor.zip"
+dest = "."
+
+with zipfile.ZipFile(zip_path, 'r') as z:
+    z.extractall(dest)
+
+print("✅ Tous les fichiers ont été installés !")
