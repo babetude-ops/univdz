@@ -21,7 +21,7 @@ class Event(db.Model):
     source = db.Column(db.String(500))
     date_collecte = db.Column(db.DateTime, default=datetime.utcnow)
     score_fiabilite = db.Column(db.Float, default=0.5)
-    statut = db.Column(db.String(50), default="a_verifier")
+    statut = db.Column(db.String(50), default="valide")
     date_validation = db.Column(db.DateTime)
     validated_by = db.Column(db.Integer, db.ForeignKey("admins.id"))
     slug = db.Column(db.String(600), unique=True)
