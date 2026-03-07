@@ -1,3 +1,6 @@
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 import logging
 import time
 import re
@@ -56,13 +59,17 @@ class ASJPScraper:
 
         try:
 
-            r = requests.get(url, headers=HEADERS, timeout=20)
+            r = requests.get(
+                url,
+                headers=HEADERS,
+                timeout=20,
+                verify=False
+            )
 
             if r.status_code == 200:
                 return BeautifulSoup(r.text, "html.parser")
 
         except Exception as e:
-
             logger.error(f"[ASJP] fetch error {url}: {e}")
 
         return None
@@ -128,11 +135,11 @@ class ASJPScraper:
                     revues.append(result)
                     logger.info(f"[ASJP] appel ouvert: {journal['nom']}")
 
+                # ralentir le scraping
                 if i % 5 == 0:
                     time.sleep(1)
 
             except Exception as e:
-
                 logger.error(f"[ASJP] erreur {journal['url']} : {e}")
 
         logger.info(f"[ASJP] {len(revues)} revues avec appel ouvert")
@@ -143,7 +150,6 @@ class ASJPScraper:
     def run_revues(self, app):
 
         with app.app_context():
-
             results = self.scrape()
 
         return len(results)
