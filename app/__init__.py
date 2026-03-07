@@ -45,13 +45,29 @@ def create_app(config_name="default"):
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(api_bp, url_prefix="/api")
 
+    # ─────────────────────────────────────────
     # Scheduler (scraping automatique)
+    # ─────────────────────────────────────────
     if not scheduler.running:
-        from app.scrapers.scheduler import schedule_jobs
-        schedule_jobs(scheduler, app)
+        from app.scrapers.runner import run_all_scrapers
+
+        def scraper_job():
+            with app.app_context():
+                run_all_scrapers()
+
+        scheduler.add_job(
+            func=scraper_job,
+            trigger="interval",
+            hours=24,
+            id="daily_scraper",
+            replace_existing=True,
+        )
+
         scheduler.start()
 
+    # ─────────────────────────────────────────
     # Création des tables + admin
+    # ─────────────────────────────────────────
     with app.app_context():
         db.create_all()
         _create_admin()
