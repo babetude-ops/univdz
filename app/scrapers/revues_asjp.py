@@ -16,7 +16,7 @@ from app.models.event import Revue
 
 logger = logging.getLogger(__name__)
 
-ASJP_BASE_URL = "https://www.asjp.cerist.dz/en/PresentationRevue/"
+ASJP_BASE_URL = "http://www.asjp.cerist.dz/en/PresentationRevue/"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0"

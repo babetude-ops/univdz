@@ -1,0 +1,16 @@
+[0;1;31m×[0m dzcademia.service - DZcademia Flask App
+     Loaded: loaded (/etc/systemd/system/dzcademia.service; enabled; vendor preset: enabled)
+     Active: [0;1;31mfailed[0m (Result: exit-code) since Sun 2026-03-08 21:20:23 UTC; 1min 0s ago
+    Process: 4370 ExecStart=/var/www/dzcademia/venv/bin/gunicorn --workers 2 --bind unix:/var/www/dzcademia/dzcademia.sock wsgi:app [0;1;31m(code=exited, status=3)[0m
+   Main PID: 4370 (code=exited, status=3)
+        CPU: 1.290s
+
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: [0;1;39m[0;1;31m[0;1;39mdzcademia.service: Main process exited, code=exited, status=3/NOTIMPLEMENTED[0m
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mdzcademia.service: Failed with result 'exit-code'.[0m
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: dzcademia.service: Consumed 1.290s CPU time.
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: dzcademia.service: Scheduled restart job, restart counter is at 5.
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: Stopped DZcademia Flask App.
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: dzcademia.service: Consumed 1.290s CPU time.
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mdzcademia.service: Start request repeated too quickly.[0m
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: [0;1;38;5;185m[0;1;39m[0;1;38;5;185mdzcademia.service: Failed with result 'exit-code'.[0m
+Mar 08 21:20:23 cont1176.my-cloud-control.com systemd[1]: [0;1;31m[0;1;39m[0;1;31mFailed to start DZcademia Flask App.[0m
