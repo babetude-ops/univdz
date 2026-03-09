@@ -1,67 +1,136 @@
 {% extends "base.html" %}
 
-{% block title %}UnivDZ — Manifestations universitaires{% endblock %}
+{% block title %}La boussole du Web{% endblock %}
 
 {% block content %}
 
-<div class="homepage">
+<section class="hero-search">
 
-<section class="hero-block">
-
-<h1 class="hero-title">
-<a href="/evenements">
-Appels à communication
-</a>
+<h1 class="home-main-title">
+La boussole du Web
 </h1>
 
-<p class="hero-links">
-
-<a href="/evenements?type=manif">Manifestations</a>
-
-<span>•</span>
-
-<a href="/evenements?type=colloque">Colloques</a>
-
-<span>•</span>
-
-<a href="/evenements?type=seminaire">Séminaires</a>
-
+<p class="home-subtitle">
+{{ stats.total }} événements universitaires recensés
 </p>
 
-</section>
+<form class="search-bar" action="/evenements" method="get">
 
+<input type="text" name="q" placeholder="Mot clé">
 
+<select name="type">
 
-<section class="hero-block">
+<option value="">Type d'événement</option>
+<option value="colloque">Colloque</option>
+<option value="séminaire">Séminaire</option>
+<option value="journée_etude">Journée d'étude</option>
+<option value="appel_communication">Appel à communication</option>
 
-<h1 class="hero-title">
-<a href="/bourses">
-Les Bourses
-</a>
-</h1>
+</select>
 
-</section>
+<select name="wilaya">
 
+<option value="">Wilaya</option>
 
+{% for w in wilayas %}
+<option value="{{ w }}">{{ w }}</option>
+{% endfor %}
 
-<section class="hero-block">
+</select>
 
-<h1 class="hero-title">
-<a href="/revues">
-Appels à contribution
-</a>
-</h1>
+<button type="submit" class="btn btn-primary">
+Rechercher
+</button>
 
-<p class="hero-links">
-
-<a href="/revues">
-Revues scientifiques
-</a>
-
-</p>
+</form>
 
 </section>
+
+
+
+<section class="section-home">
+
+<h2 class="section-title">
+Appels à communication ({{ stats.colloques }})
+</h2>
+
+<div class="grid">
+
+<a href="/evenements?type=colloque" class="card">
+
+<h3>Colloques</h3>
+<p>Conférences académiques nationales</p>
+
+</a>
+
+<a href="/evenements?type=séminaire" class="card">
+
+<h3>Séminaires</h3>
+<p>Rencontres scientifiques universitaires</p>
+
+</a>
+
+<a href="/evenements?type=journée_etude" class="card">
+
+<h3>Journées d'étude</h3>
+<p>Événements scientifiques spécialisés</p>
+
+</a>
 
 </div>
+
+</section>
+
+
+
+<section class="section-home">
+
+<h2 class="section-title">
+Bourses ({{ stats.bourses }})
+</h2>
+
+<div class="grid">
+
+{% for b in bourses %}
+
+<a href="/evenement/{{ b.slug }}" class="card">
+
+<h3>{{ b.titre }}</h3>
+
+<p>{{ b.universite }} — {{ b.wilaya }}</p>
+
+</a>
+
+{% endfor %}
+
+</div>
+
+</section>
+
+
+
+<section class="section-home">
+
+<h2 class="section-title">
+Derniers événements
+</h2>
+
+<div class="grid">
+
+{% for e in upcoming %}
+
+<a href="/evenement/{{ e.slug }}" class="card">
+
+<h3>{{ e.titre }}</h3>
+
+<p>{{ e.universite }} — {{ e.wilaya }}</p>
+
+</a>
+
+{% endfor %}
+
+</div>
+
+</section>
 
 {% endblock %}

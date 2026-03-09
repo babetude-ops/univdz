@@ -5,22 +5,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>{% block title %}UnivDZ — Manifestations Universitaires Algérie{% endblock %}</title>
-
-<meta name="description" content="{% block meta_description %}Plateforme nationale centralisant les colloques, séminaires et bourses universitaires en Algérie.{% endblock %}">
-
-<link rel="canonical" href="{{ request.url }}">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>{% block title %}La boussole du Web{% endblock %}</title>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
-{% block extra_css %}{% endblock %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 </head>
-
 
 <body>
 
@@ -29,17 +21,14 @@
 <div class="container nav-container">
 
 <a href="{{ url_for('main.index') }}" class="logo">
-Univ<span>DZ</span>
+La boussole du Web
 </a>
 
 <nav class="nav-menu">
 
 <a href="{{ url_for('main.index') }}">Accueil</a>
-
 <a href="{{ url_for('main.evenements') }}">Événements</a>
-
 <a href="{{ url_for('main.bourses') }}">Bourses</a>
-
 <a href="{{ url_for('main.revues') }}">Revues</a>
 
 </nav>
@@ -47,25 +36,6 @@ Univ<span>DZ</span>
 </div>
 
 </header>
-
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-{% if messages %}
-<div class="container flash-container">
-
-{% for cat, msg in messages %}
-
-<div class="flash flash-{{ cat }}">
-{{ msg }}
-</div>
-
-{% endfor %}
-
-</div>
-{% endif %}
-{% endwith %}
-
-
 
 <main class="main-content">
 
@@ -77,34 +47,21 @@ Univ<span>DZ</span>
 
 </main>
 
-
-
 <footer class="footer">
 
 <div class="container footer-inner">
 
 <div class="footer-brand">
-Univ<span>DZ</span>
+La boussole du Web
 </div>
 
-<p class="footer-text">
-Plateforme des manifestations universitaires algériennes
+<p>
+Plateforme des manifestations universitaires et opportunités académiques
 </p>
-
-<div class="footer-links">
-
-<a href="{{ url_for('admin.login') }}">Admin</a>
-
-<a href="{{ url_for('api.get_events') }}">API</a>
-
-</div>
 
 </div>
 
 </footer>
-
-
-{% block extra_js %}{% endblock %}
 
 </body>
 </html>
