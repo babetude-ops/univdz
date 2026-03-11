@@ -1,67 +1,120 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>{% block title %}La boussole du Web{% endblock %}</title>
-
+<title>{{ site.get('site_nom', 'DZcademia') }}</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@300;400;500&family=Cairo:wght@300;400;600;700&family=Raleway:wght@300;400;500;600&family=Montserrat:wght@300;400;500;600&family=Nunito:wght@300;400;600;700&family=Lato:wght@300;400;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --couleur-primaire:       {{ site.get('couleur_primaire',      '#1E3A5F') }};
+  --couleur-secondaire:     {{ site.get('couleur_secondaire',    '#f5a623') }};
+  --couleur-fond:           {{ site.get('couleur_fond',          '#F3F5F7') }};
+  --couleur-surface:        {{ site.get('couleur_surface',       '#ffffff') }};
+  --couleur-texte:          {{ site.get('couleur_texte',         '#1f2933') }};
+  --couleur-succes:         {{ site.get('couleur_succes',        '#12b76a') }};
+  --couleur-danger:         {{ site.get('couleur_danger',        '#f04438') }};
+  --carte-fond:             {{ site.get('carte_fond',            '#ffffff') }};
+  --carte-bordure:          {{ site.get('carte_bordure',         '#e8f0fe') }};
+  --carte-titre:            {{ site.get('carte_titre',           '#1E3A5F') }};
+  --carte-texte:            {{ site.get('carte_texte',           '#6b7280') }};
+  --carte-bouton:           {{ site.get('carte_bouton',          '#1E3A5F') }};
+  --carte-bouton-texte:     {{ site.get('carte_bouton_texte',    '#ffffff') }};
+  --section-fond:           {{ site.get('section_fond',          '#f8fafc') }};
+  --section-titre-couleur:  {{ site.get('section_titre_couleur', '#1E3A5F') }};
+  --voir-tout-couleur:      {{ site.get('voir_tout_couleur',     '#1E3A5F') }};
+  --font-famille:           '{{ site.get('font_famille', 'Inter') }}', sans-serif;
+  --font-size:              {{ site.get('font_size',             '16') }}px;
+  --font-size-titre:        {{ site.get('font_size_titre',       '36') }}px;
+  --line-height:            {{ site.get('line_height',           '1.6') }};
+  --text-align:             {{ site.get('text_align',            'left') }};
+}
+body {
+  background:  var(--couleur-fond)  !important;
+  color:       var(--couleur-texte) !important;
+  font-family: var(--font-famille)  !important;
+  font-size:   var(--font-size)     !important;
+  line-height: var(--line-height)   !important;
+  {% if site.get('font_bold')   %}font-weight: 700 !important;{% endif %}
+  {% if site.get('font_italic') %}font-style: italic !important;{% endif %}
+}
+.navbar       { background: var(--couleur-primaire) !important; }
+.event-card   { background: var(--carte-fond) !important; border-color: var(--carte-bordure) !important; }
+.event-titre  { color: var(--carte-titre) !important; }
+.event-location, .event-univ { color: var(--carte-texte) !important; }
+.event-btn    { background: var(--carte-bouton) !important; color: var(--carte-bouton-texte) !important; }
+.latest-events { background: var(--section-fond) !important; }
+.section-title { color: var(--section-titre-couleur) !important; }
+.section-title::after { background: var(--section-titre-couleur) !important; }
+.voir-tout { color: var(--voir-tout-couleur) !important; border-color: var(--voir-tout-couleur) !important; }
+.voir-tout:hover { background: var(--voir-tout-couleur) !important; color: white !important; }
 
+/* ── Font sizes from builder ── */
+{% set pos = site.get('element_positions_parsed', {}) %}
+{% if pos.get('el-logo', {}).get('fontSize') %}.logo { font-size: {{ pos['el-logo']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-nav-links', {}).get('fontSize') %}.nav-links a { font-size: {{ pos['el-nav-links']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-count', {}).get('fontSize') %}.hero-count { font-size: {{ pos['el-count']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-hero-text', {}).get('fontSize') %}.hero-text { font-size: {{ pos['el-hero-text']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-hero-btn', {}).get('fontSize') %}.hero-search button { font-size: {{ pos['el-hero-btn']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-section-title', {}).get('fontSize') %}.section-title { font-size: {{ pos['el-section-title']['fontSize'] }}px !important; }{% endif %}
+{% if pos.get('el-footer-txt', {}).get('fontSize') %}.site-footer p { font-size: {{ pos['el-footer-txt']['fontSize'] }}px !important; }{% endif %}
+
+/* ── Animations ── */
+@keyframes site-pulse  {0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes site-bounce {0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes site-shake  {0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes site-float  {0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes site-spin   {from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes site-flash  {0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes site-glow   {0%,100%{text-shadow:0 0 8px currentColor}50%{text-shadow:0 0 30px currentColor,0 0 60px currentColor}}
+@keyframes site-zoom   {0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+@keyframes site-rubber {0%{transform:scale(1,1)}30%{transform:scale(1.25,.75)}50%{transform:scale(.75,1.25)}75%{transform:scale(1.15,.85)}100%{transform:scale(1,1)}}
+@keyframes site-swing  {0%,100%{transform:rotate(0deg)}20%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}}
+@keyframes site-neon   {0%,100%{opacity:1;filter:brightness(1)}50%{opacity:.6;filter:brightness(1.8)}}
+@keyframes site-rainbow{0%{color:#f00}16%{color:#f70}33%{color:#ff0}50%{color:#0c0}66%{color:#06f}83%{color:#80f}100%{color:#f00}}
+
+{% set SEL = {
+  'pv-logo':          '.logo',
+  'pv-count':         '.hero-count',
+  'pv-hero-titre':    '.hero-text',
+  'pv-hero-texte':    '.hero-desc',
+  'pv-search-btn':    '.hero-search button[type=submit]',
+  'pv-section-titre': '.section-title',
+  'pv-voir-tout':     '.voir-tout',
+  'pv-card-0':        '.events-grid .event-card:nth-child(1)',
+  'pv-card-1':        '.events-grid .event-card:nth-child(2)',
+  'pv-card-2':        '.events-grid .event-card:nth-child(3)',
+  'pv-footer-txt':    '.site-footer p:first-child',
+  'pv-footer-copy':   '.footer-copy'
+} %}
+{% set anims = site.get('element_animations_parsed', {}) %}
+{% for elem_id, cfg in anims.items() %}{% if elem_id in SEL and cfg.get('anim') and cfg.get('dur') %}
+{{ SEL[elem_id] }} { animation: site-{{ cfg['anim'] }} {{ cfg['dur'] }} ease-in-out infinite !important; }
+{% endif %}{% endfor %}
+</style>
 </head>
-
 <body>
-
-<header class="navbar">
-
-<div class="container nav-container">
-
-<a href="{{ url_for('main.index') }}" class="logo">
-La boussole du Web
-</a>
-
-<nav class="nav-menu">
-
-<a href="{{ url_for('main.index') }}">Accueil</a>
-<a href="{{ url_for('main.evenements') }}">Événements</a>
-<a href="{{ url_for('main.bourses') }}">Bourses</a>
-<a href="{{ url_for('main.revues') }}">Revues</a>
-
+<nav class="navbar">
+  <div class="nav-container">
+    <a href="/" class="logo">{{ site.get('site_nom', 'DZcademia') }}</a>
+    <div class="menu-toggle" onclick="toggleMenu()">☰</div>
+    <div class="nav-links" id="menu">
+      <a href="/">{{ site.get('menu_accueil', 'Accueil') }}</a>
+      <a href="/manifestations">{{ site.get('menu_manifestations', 'Manifestations scientifiques') }}</a>
+      <a href="/bourses">{{ site.get('menu_bourses', 'Bourses') }}</a>
+      <a href="/revues">{{ site.get('menu_revues', 'Revues') }}</a>
+    </div>
+  </div>
 </nav>
-
-</div>
-
-</header>
-
-<main class="main-content">
-
-<div class="container">
-
-{% block content %}{% endblock %}
-
-</div>
-
-</main>
-
-<footer class="footer">
-
-<div class="container footer-inner">
-
-<div class="footer-brand">
-La boussole du Web
-</div>
-
-<p>
-Plateforme des manifestations universitaires et opportunités académiques
-</p>
-
-</div>
-
+<main>{% block content %}{% endblock %}</main>
+<footer class="site-footer">
+  <div class="footer-container">
+    <p>{{ site.get('footer_texte', 'DZcademia — Portail des opportunités académiques') }}</p>
+    <p class="footer-copy">{{ site.get('footer_copyright', '© 2026 DZcademia') }}</p>
+  </div>
 </footer>
-
+<script>function toggleMenu(){ document.getElementById("menu").classList.toggle("show"); }</script>
 </body>
 </html>

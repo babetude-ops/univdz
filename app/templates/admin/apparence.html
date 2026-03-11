@@ -1,0 +1,911 @@
+{% extends 'admin/base_admin.html' %}
+{% block title %}Studio — Page Builder{% endblock %}
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{--accent:#00c896;--bg:#080d18;--surface:#0f1623;--surface2:#141e30;--border:rgba(255,255,255,.07);--text:#e3eaf5;--muted:#8899aa;}
+
+/* ══ LAYOUT ══ */
+/* FIX: colonnes rééquilibrées — left moins large, right plus large pour les props */
+.builder-wrap{
+  display:grid;
+  grid-template-columns:230px 1fr 260px;   /* était 260px 1fr 220px */
+  height:calc(100vh - 60px);
+  margin:-20px;
+  overflow:hidden;
+  font-family:'DM Sans',sans-serif;
+}
+
+/* ══ LEFT PANEL ══ */
+.left-panel{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.panel-top{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.panel-top h2{font-size:.88rem;font-weight:700;color:var(--text);}
+.pub-btn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 4px 14px rgba(0,200,150,.3);transition:all .2s;}
+.pub-btn:hover{transform:scale(1.04);}
+
+/* ── Layers tree ── */
+.layers-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);padding:10px 14px 6px;border-bottom:1px solid var(--border);}
+.layers-list{flex:1;overflow-y:auto;padding:8px;}
+.layers-list::-webkit-scrollbar{width:3px;}
+.layers-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);}
+.layer-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:.78rem;color:var(--muted);transition:all .18s;margin-bottom:3px;border:1px solid transparent;}
+.layer-item:hover{background:var(--surface2);color:var(--text);}
+.layer-item.selected{background:rgba(0,200,150,.08);border-color:rgba(0,200,150,.25);color:var(--accent);}
+.layer-icon{font-size:.9rem;flex-shrink:0;}
+.layer-vis{margin-left:auto;cursor:pointer;opacity:.5;font-size:.8rem;flex-shrink:0;}
+.layer-vis:hover{opacity:1;}
+
+/* ══ CANVAS ══ */
+.canvas-area{background:#1a1f2e;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+.canvas-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.tbar-btn{padding:5px 10px;border-radius:6px;background:transparent;border:1px solid var(--border);color:var(--muted);font-size:.7rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap;}
+.tbar-btn:hover{border-color:var(--accent);color:var(--accent);}
+.tbar-btn.active{background:var(--surface2);color:var(--text);border-color:var(--accent);}
+.tbar-sep{width:1px;height:20px;background:var(--border);flex-shrink:0;}
+.zoom-display{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--accent);min-width:40px;text-align:center;}
+.hint-bar{padding:4px 14px;background:rgba(0,200,150,.04);border-bottom:1px solid rgba(0,200,150,.08);font-size:.67rem;color:var(--accent);text-align:center;flex-shrink:0;}
+
+/* ── Canvas viewport ── */
+.canvas-viewport{flex:1;overflow:auto;position:relative;cursor:default;}
+.canvas-viewport::-webkit-scrollbar{width:8px;height:8px;}
+.canvas-viewport::-webkit-scrollbar-track{background:rgba(0,0,0,.2);}
+.canvas-viewport::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px;}
+
+/* ── Site canvas (the actual page) ── */
+.site-canvas{
+  position:relative;
+  background:white;
+  transform-origin:top left;
+  transition:transform .15s;
+  box-shadow:0 20px 80px rgba(0,0,0,.6);
+  min-height:900px;
+  overflow:hidden;
+}
+
+/* ── Draggable/resizable elements ── */
+.builder-el{
+  position:absolute;
+  cursor:move;
+  user-select:none;
+  box-sizing:border-box;
+}
+.builder-el:hover .el-outline{opacity:1;}
+.builder-el.selected .el-outline{opacity:1;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+.el-outline{
+  position:absolute;inset:-2px;
+  border:2px dashed rgba(0,200,150,.4);
+  border-radius:4px;pointer-events:none;
+  opacity:0;transition:opacity .15s;
+  z-index:100;
+}
+
+/* ── Resize handles ── */
+.resize-handle{
+  position:absolute;width:10px;height:10px;
+  background:var(--accent);border:2px solid white;
+  border-radius:2px;z-index:200;
+  opacity:0;transition:opacity .15s;
+}
+.builder-el.selected .resize-handle{opacity:1;}
+.rh-nw{top:-5px;left:-5px;cursor:nw-resize;}
+.rh-ne{top:-5px;right:-5px;cursor:ne-resize;}
+.rh-sw{bottom:-5px;left:-5px;cursor:sw-resize;}
+.rh-se{bottom:-5px;right:-5px;cursor:se-resize;}
+.rh-n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize;}
+.rh-s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize;}
+.rh-w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize;}
+.rh-e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize;}
+
+/* ── Element toolbar (floats above selected) ── */
+.el-toolbar{
+  position:absolute;top:-36px;left:0;
+  display:flex;gap:3px;background:rgba(8,13,24,.95);
+  border:1px solid var(--border);border-radius:8px;
+  padding:4px 6px;z-index:300;opacity:0;pointer-events:none;
+  transition:opacity .2s;white-space:nowrap;
+  backdrop-filter:blur(10px);
+}
+.builder-el.selected .el-toolbar{opacity:1;pointer-events:all;}
+.et-btn{padding:3px 8px;border-radius:5px;background:transparent;border:none;color:var(--muted);font-size:.65rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;}
+.et-btn:hover{background:var(--surface2);color:var(--text);}
+.et-btn.danger:hover{color:#f04438;}
+
+/* ── Font size handle ── */
+.fs-handle{
+  position:absolute;bottom:-28px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:5px;background:rgba(8,13,24,.95);
+  border:1px solid var(--border);border-radius:6px;padding:3px 8px;
+  z-index:300;opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.builder-el.selected .fs-handle{opacity:1;pointer-events:all;}
+.fs-btn{width:18px;height:18px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;}
+.fs-btn:hover{border-color:var(--accent);color:var(--accent);}
+.fs-val{font-size:.65rem;color:var(--accent);font-family:'JetBrains Mono',monospace;min-width:28px;text-align:center;}
+
+/* ══ RIGHT PANEL — FIX: plus large + pas de coupure ══ */
+.right-panel{
+  background:var(--surface);
+  border-left:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  min-width:0; /* FIX: empêche le débordement */
+}
+.right-top{
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  font-size:.78rem;
+  font-weight:700;
+  color:var(--text);
+  flex-shrink:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.props-scroll{
+  flex:1;
+  overflow-y:auto;
+  overflow-x:hidden; /* FIX: pas de scroll horizontal */
+  padding:10px 12px;
+}
+.props-scroll::-webkit-scrollbar{width:3px;}
+.props-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);}
+.prop-section{margin-bottom:14px;}
+.prop-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:7px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+.prop-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.prop-row label{font-size:.68rem;color:var(--muted);min-width:50px;flex-shrink:0;}
+.prop-input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.75rem;font-family:'DM Sans',sans-serif;outline:none;}
+.prop-input:focus{border-color:var(--accent);}
+.prop-color-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+.prop-color-row label{font-size:.68rem;color:var(--muted);min-width:50px;flex-shrink:0;}
+.prop-swatch{width:26px;height:26px;border-radius:5px;border:2px solid rgba(255,255,255,.12);flex-shrink:0;position:relative;cursor:pointer;}
+.prop-swatch input{opacity:0;position:absolute;inset:0;cursor:pointer;}
+.prop-hex{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.72rem;font-family:'JetBrains Mono',monospace;outline:none;}
+.prop-hex:focus{border-color:var(--accent);}
+
+/* FIX: grille de positions qui ne déborde pas */
+.pos-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.pos-field label{display:block;font-size:.62rem;color:var(--muted);margin-bottom:2px;}
+.pos-field input{
+  width:100%;
+  min-width:0; /* FIX clé : empêche le débordement de la grille */
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:5px 7px;
+  color:var(--text);
+  font-size:.74rem;
+  font-family:'JetBrains Mono',monospace;
+  outline:none;
+  box-sizing:border-box; /* FIX: padding inclus dans la largeur */
+}
+.pos-field input:focus{border-color:var(--accent);}
+.no-sel{padding:20px 12px;text-align:center;color:var(--muted);font-size:.75rem;line-height:1.6;}
+
+/* ══ SITE ELEMENTS default styles ══ */
+.el-navbar-bg{background:#1E3A5F;width:100%;height:60px;display:flex;align-items:center;padding:0 30px;gap:20px;}
+.el-logo-txt{color:white;font-size:20px;font-weight:700;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.el-nav-link{color:white;font-size:14px;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.el-hero-bg{background-image:url('/static/images/hero.jpg');background-size:cover;background-position:center;width:100%;height:380px;display:flex;align-items:center;justify-content:center;}
+.el-hero-overlay{background:rgba(0,0,0,.45);border-radius:12px;padding:30px 28px;text-align:center;color:white;max-width:500px;}
+.el-count{font-size:42px;font-weight:700;color:white;text-align:center;}
+.el-hero-text{font-size:16px;color:white;text-align:center;}
+.el-btn{padding:9px 20px;border-radius:7px;font-weight:600;font-size:14px;color:white;background:#1E3A5F;display:inline-block;cursor:pointer;white-space:nowrap;}
+.el-section-title{font-size:24px;font-weight:700;color:#1E3A5F;}
+.el-card{background:white;border:1px solid #e8f0fe;border-radius:12px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,.06);}
+.el-card-badge{background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:8px;}
+.el-card-title{font-size:14px;font-weight:700;color:#1E3A5F;margin-bottom:6px;}
+.el-card-loc{font-size:12px;color:#6b7280;margin-bottom:10px;}
+.el-card-btn{background:#1E3A5F;color:white;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;display:inline-block;}
+.el-footer-bg{background:#1E3A5F;width:100%;padding:28px 30px;text-align:center;}
+.el-footer-txt{color:white;font-size:14px;}
+
+/* ══ TOAST ══ */
+.toast{position:fixed;top:16px;right:16px;z-index:99999;background:rgba(8,13,24,.96);border:1px solid var(--accent);border-radius:9px;padding:9px 15px;font-size:.8rem;color:var(--accent);display:none;backdrop-filter:blur(12px);box-shadow:0 8px 28px rgba(0,200,150,.2);}
+
+/* ══ GRID OVERLAY ══ */
+.grid-overlay{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .2s;z-index:1;background-image:linear-gradient(rgba(0,200,150,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(0,200,150,.08) 1px,transparent 1px);background-size:20px 20px;}
+.grid-overlay.show{opacity:1;}
+
+/* ══ FIX: boutons d'action dans props qui ne débordent pas ══ */
+.prop-action-btn{
+  width:100%;
+  margin-bottom:5px;
+  padding:7px 10px;
+  border-radius:7px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  color:var(--text);
+  font-size:.73rem;
+  cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  text-align:left;
+  transition:all .18s;
+  box-sizing:border-box;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.prop-action-btn:hover{border-color:var(--accent);color:var(--accent);}
+.prop-action-btn.danger{background:rgba(240,68,56,.08);border-color:rgba(240,68,56,.25);color:#f04438;}
+.prop-action-btn.danger:hover{background:rgba(240,68,56,.15);}
+</style>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}<div class="toast" id="toast" style="display:block">{% for c,m in messages %}✅ {{m}}{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<form method="POST" action="{{ url_for('admin.sauver_apparence') }}" id="sf">
+{% set AF=['couleur_primaire','couleur_secondaire','couleur_fond','couleur_surface','couleur_texte','couleur_succes','couleur_danger','carte_fond','carte_bordure','carte_titre','carte_texte','carte_bouton','carte_bouton_texte','carte_ombre','section_fond','section_titre_couleur','voir_tout_couleur','site_nom','site_slogan','menu_accueil','menu_manifestations','menu_bourses','menu_revues','hero_titre','hero_texte','hero_bouton','section_titre','footer_texte','footer_copyright','email_contact','font_famille','font_size','font_size_titre','line_height','font_bold','font_italic','text_align','element_animations','element_positions'] %}
+{% for f in AF %}<input type="hidden" name="{{f}}" id="v-{{f}}" value="{{ settings.get(f,'') }}">{% endfor %}
+
+<div class="builder-wrap">
+
+  <!-- ════ LEFT: LAYERS ════ -->
+  <div class="left-panel">
+    <div class="panel-top">
+      <h2>🎨 Studio</h2>
+      <button type="submit" class="pub-btn">💾 Publier</button>
+    </div>
+    <div class="layers-title">📋 Calques</div>
+    <div class="layers-list" id="layers-list">
+      <!-- filled by JS -->
+    </div>
+    <!-- Quick add -->
+    <div style="padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0;">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:7px;">➕ Ajouter élément</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        <button type="button" onclick="addEl('text')" style="padding:6px 8px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.borderColor='#00c896'" onmouseout="this.style.borderColor='var(--border)'">📝 Texte</button>
+        <button type="button" onclick="addEl('btn')" style="padding:6px 8px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.borderColor='#00c896'" onmouseout="this.style.borderColor='var(--border)'">🔵 Bouton</button>
+        <button type="button" onclick="addEl('card')" style="padding:6px 8px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.borderColor='#00c896'" onmouseout="this.style.borderColor='var(--border)'">🃏 Carte</button>
+        <button type="button" onclick="addEl('divider')" style="padding:6px 8px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.7rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;" onmouseover="this.style.borderColor='#00c896'" onmouseout="this.style.borderColor='var(--border)'">➖ Séparateur</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ CENTER: CANVAS ════ -->
+  <div class="canvas-area">
+    <div class="canvas-topbar">
+      <button class="tbar-btn active" id="dev-desktop" onclick="setDev(1200,this)">🖥️ Bureau</button>
+      <button class="tbar-btn" id="dev-tablet" onclick="setDev(768,this)">📱 Tablette</button>
+      <button class="tbar-btn" id="dev-mobile" onclick="setDev(390,this)">📲 Mobile</button>
+      <div class="tbar-sep"></div>
+      <button class="tbar-btn" onclick="zoomBy(-10)">−</button>
+      <span class="zoom-display" id="zoom-display">100%</span>
+      <button class="tbar-btn" onclick="zoomBy(10)">+</button>
+      <button class="tbar-btn" onclick="setZoom(100)" title="Reset">↺</button>
+      <div class="tbar-sep"></div>
+      <button class="tbar-btn" id="grid-btn" onclick="toggleGrid()">⊞ Grille</button>
+      <button class="tbar-btn" onclick="resetPositions()">🔄 Reset</button>
+      <button class="tbar-btn" onclick="deselectAll()">✕ Désél.</button>
+    </div>
+    <div class="hint-bar">✋ <strong>Glisser</strong> pour déplacer · ↔ <strong>Poignées</strong> pour redimensionner · 🖱️ <strong>Double-clic</strong> pour éditer · <strong>Molette</strong> pour zoomer</div>
+
+    <div class="canvas-viewport" id="canvas-viewport">
+      <div style="padding:30px;min-width:fit-content;">
+        <div class="site-canvas" id="site-canvas">
+          <div class="grid-overlay" id="grid-overlay"></div>
+
+          <!-- ══ NAVBAR BG ══ -->
+          <div class="builder-el" id="el-navbar-bg" data-label="🎨 Fond Navbar" data-type="navbar-bg">
+            <div class="el-outline"></div>
+            <div class="el-toolbar">
+              <span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🎨 Fond Navbar</span>
+              <div class="tbar-sep" style="width:1px;height:14px;background:var(--border);"></div>
+              <button class="et-btn" onclick="editText(event,'el-navbar-bg')">✏️ Texte</button>
+            </div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+            <div class="el-navbar-bg" id="navbar-bg-inner" style="background:{{ settings.get('couleur_primaire','#1E3A5F') }};">
+            </div>
+          </div>
+
+          <!-- ══ LOGO ══ -->
+          <div class="builder-el" id="el-logo" data-label="🏷️ Logo" data-type="text" data-field="site_nom">
+            <div class="el-outline"></div>
+            <div class="el-toolbar">
+              <span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🏷️ Logo</span>
+              <div class="tbar-sep" style="width:1px;height:14px;background:var(--border);"></div>
+              <button class="et-btn" onclick="editText(event,'el-logo')">✏️ Éditer</button>
+              <button class="et-btn" onclick="bringFwd('el-logo')">⬆️</button>
+              <button class="et-btn" onclick="sendBck('el-logo')">⬇️</button>
+            </div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-logo',-2)">−</button><span class="fs-val" id="fs-el-logo">20px</span><button class="fs-btn" onclick="changeFontSize('el-logo',2)">+</button></div>
+            <div class="el-logo-txt" id="el-logo-txt" ondblclick="inlineEdit(event,'el-logo','site_nom')" style="color:white;font-size:20px;">{{ settings.get('site_nom','DZcademia') }}</div>
+          </div>
+
+          <!-- ══ NAV LINKS ══ -->
+          <div class="builder-el" id="el-nav-links" data-label="🔗 Liens menu" data-type="nav">
+            <div class="el-outline"></div>
+            <div class="el-toolbar">
+              <span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🔗 Menu</span>
+              <button class="et-btn" onclick="bringFwd('el-nav-links')">⬆️</button>
+              <button class="et-btn" onclick="sendBck('el-nav-links')">⬇️</button>
+            </div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-nav-links',-1)">−</button><span class="fs-val" id="fs-el-nav-links">14px</span><button class="fs-btn" onclick="changeFontSize('el-nav-links',1)">+</button></div>
+            <div style="display:flex;gap:20px;align-items:center;">
+              <span class="el-nav-link" ondblclick="inlineEdit(event,'el-nav-links','menu_accueil')" id="nl-1">{{ settings.get('menu_accueil','Accueil') }}</span>
+              <span class="el-nav-link" ondblclick="inlineEdit(event,'el-nav-links','menu_manifestations')" id="nl-2">{{ settings.get('menu_manifestations','Manifestations') }}</span>
+              <span class="el-nav-link" ondblclick="inlineEdit(event,'el-nav-links','menu_bourses')" id="nl-3">{{ settings.get('menu_bourses','Bourses') }}</span>
+              <span class="el-nav-link" ondblclick="inlineEdit(event,'el-nav-links','menu_revues')" id="nl-4">{{ settings.get('menu_revues','Revues') }}</span>
+            </div>
+          </div>
+
+          <!-- ══ HERO BG ══ -->
+          <div class="builder-el" id="el-hero-bg" data-label="🖼️ Hero image" data-type="hero-bg">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🖼️ Hero</span></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+            <div class="el-hero-bg" style="width:100%;height:100%;"></div>
+          </div>
+
+          <!-- ══ HERO OVERLAY ══ -->
+          <div class="builder-el" id="el-hero-overlay" data-label="⬛ Hero overlay" data-type="hero-overlay">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">⬛ Overlay</span><div class="tbar-sep" style="width:1px;height:14px;background:var(--border);"></div><button class="et-btn" onclick="bringFwd('el-hero-overlay')">⬆️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+            <div style="background:rgba(0,0,0,.45);border-radius:12px;width:100%;height:100%;"></div>
+          </div>
+
+          <!-- ══ HERO COUNT ══ -->
+          <div class="builder-el" id="el-count" data-label="🔢 Compteur" data-type="text">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🔢 Compteur</span><button class="et-btn" onclick="bringFwd('el-count')">⬆️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-count',-2)">−</button><span class="fs-val" id="fs-el-count">42px</span><button class="fs-btn" onclick="changeFontSize('el-count',2)">+</button></div>
+            <div class="el-count" id="el-count-txt" ondblclick="inlineEdit(event,'el-count','hero_count')" style="font-size:42px;">386</div>
+          </div>
+
+          <!-- ══ HERO TEXT ══ -->
+          <div class="builder-el" id="el-hero-text" data-label="📝 Texte hero" data-type="text" data-field="hero_titre">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">📝 Texte hero</span><button class="et-btn" onclick="bringFwd('el-hero-text')">⬆️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-hero-text',-1)">−</button><span class="fs-val" id="fs-el-hero-text">16px</span><button class="fs-btn" onclick="changeFontSize('el-hero-text',1)">+</button></div>
+            <div class="el-hero-text" id="el-hero-text-txt" ondblclick="inlineEdit(event,'el-hero-text','hero_titre')" style="font-size:16px;">{{ settings.get('hero_titre','événements universitaires recensés') }}</div>
+          </div>
+
+          <!-- ══ HERO BTN ══ -->
+          <div class="builder-el" id="el-hero-btn" data-label="🔵 Bouton hero" data-type="btn" data-field="hero_bouton">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🔵 Bouton</span><button class="et-btn" onclick="bringFwd('el-hero-btn')">⬆️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-hero-btn',-1)">−</button><span class="fs-val" id="fs-el-hero-btn">14px</span><button class="fs-btn" onclick="changeFontSize('el-hero-btn',1)">+</button></div>
+            <div class="el-btn" id="el-hero-btn-txt" ondblclick="inlineEdit(event,'el-hero-btn','hero_bouton')" style="background:{{ settings.get('couleur_primaire','#1E3A5F') }};font-size:14px;">{{ settings.get('hero_bouton','Rechercher') }}</div>
+          </div>
+
+          <!-- ══ SECTION TITLE ══ -->
+          <div class="builder-el" id="el-section-title" data-label="📌 Titre section" data-type="text" data-field="section_titre">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">📌 Titre section</span></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-section-title',-2)">−</button><span class="fs-val" id="fs-el-section-title">24px</span><button class="fs-btn" onclick="changeFontSize('el-section-title',2)">+</button></div>
+            <div class="el-section-title" id="el-section-title-txt" ondblclick="inlineEdit(event,'el-section-title','section_titre')" style="color:{{ settings.get('section_titre_couleur','#1E3A5F') }};font-size:24px;">{{ settings.get('section_titre','Dernières opportunités académiques') }}</div>
+          </div>
+
+          <!-- ══ CARDS (3) ══ -->
+          {% for i in range(3) %}
+          <div class="builder-el" id="el-card-{{i}}" data-label="🃏 Carte {{i+1}}" data-type="card">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🃏 Carte {{i+1}}</span><button class="et-btn" onclick="bringFwd('el-card-{{i}}')">⬆️</button><button class="et-btn danger" onclick="deleteEl('el-card-{{i}}')">🗑️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+            <div class="el-card" style="background:{{ settings.get('carte_fond','#ffffff') }};border-color:{{ settings.get('carte_bordure','#e8f0fe') }};width:100%;height:100%;box-sizing:border-box;">
+              <div class="el-card-badge">Colloque</div>
+              <div class="el-card-title" style="color:{{ settings.get('carte_titre','#1E3A5F') }};">Exemple événement {{i+1}}</div>
+              <div class="el-card-loc" style="color:{{ settings.get('carte_texte','#6b7280') }};">📍 Alger · USTHB</div>
+              <div class="el-card-btn" style="background:{{ settings.get('carte_bouton','#1E3A5F') }};color:{{ settings.get('carte_bouton_texte','#ffffff') }};">Voir détails →</div>
+            </div>
+          </div>
+          {% endfor %}
+
+          <!-- ══ FOOTER BG ══ -->
+          <div class="builder-el" id="el-footer-bg" data-label="🦶 Footer" data-type="footer-bg">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">🦶 Footer</span></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+            <div class="el-footer-bg" id="footer-bg-inner" style="background:{{ settings.get('couleur_primaire','#1E3A5F') }};width:100%;height:100%;"></div>
+          </div>
+
+          <!-- ══ FOOTER TEXT ══ -->
+          <div class="builder-el" id="el-footer-txt" data-label="📄 Texte footer" data-type="text" data-field="footer_texte">
+            <div class="el-outline"></div>
+            <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">📄 Footer texte</span><button class="et-btn" onclick="bringFwd('el-footer-txt')">⬆️</button></div>
+            <div class="resize-handle rh-e"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-s"></div>
+            <div class="fs-handle"><button class="fs-btn" onclick="changeFontSize('el-footer-txt',-1)">−</button><span class="fs-val" id="fs-el-footer-txt">14px</span><button class="fs-btn" onclick="changeFontSize('el-footer-txt',1)">+</button></div>
+            <div class="el-footer-txt" id="el-footer-txt-content" ondblclick="inlineEdit(event,'el-footer-txt','footer_texte')" style="color:white;font-size:14px;text-align:center;">{{ settings.get('footer_texte','DZcademia — Portail des opportunités académiques') }}</div>
+          </div>
+
+        </div><!-- end site-canvas -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT: PROPERTIES ════ -->
+  <div class="right-panel">
+    <div class="right-top" id="right-title">📐 Propriétés</div>
+    <div class="props-scroll" id="props-panel">
+      <div class="no-sel">👆 Clique sur un élément pour voir ses propriétés</div>
+    </div>
+  </div>
+
+</div>
+</form>
+
+<script>
+// ══ STATE ══
+let zoom = 100;
+let canvasW = 1200;
+let selectedId = null;
+let dragging = false, resizing = false;
+let dragOffX = 0, dragOffY = 0;
+let resizeDir = '', resizeStartX = 0, resizeStartY = 0, resizeStartW = 0, resizeStartH = 0, resizeStartLeft = 0, resizeStartTop = 0;
+let gridOn = false;
+
+// Default positions & sizes
+const DEFAULTS = {
+  'el-navbar-bg':     {left:0,   top:0,   width:1200, height:60,  z:1},
+  'el-logo':          {left:30,  top:10,  width:200,  height:40,  z:10},
+  'el-nav-links':     {left:700, top:15,  width:460,  height:30,  z:10},
+  'el-hero-bg':       {left:0,   top:60,  width:1200, height:380, z:2},
+  'el-hero-overlay':  {left:350, top:110, width:500,  height:240, z:5},
+  'el-count':         {left:450, top:130, width:200,  height:70,  z:6},
+  'el-hero-text':     {left:380, top:210, width:440,  height:40,  z:6},
+  'el-hero-btn':      {left:500, top:280, width:200,  height:44,  z:6},
+  'el-section-title': {left:60,  top:490, width:500,  height:50,  z:3},
+  'el-card-0':        {left:60,  top:560, width:340,  height:180, z:3},
+  'el-card-1':        {left:430, top:560, width:340,  height:180, z:3},
+  'el-card-2':        {left:800, top:560, width:340,  height:180, z:3},
+  'el-footer-bg':     {left:0,   top:780, width:1200, height:90,  z:2},
+  'el-footer-txt':    {left:300, top:800, width:600,  height:50,  z:5},
+};
+
+// Font sizes
+const fontSizes = {};
+
+// Saved positions (from settings)
+let positions = {};
+try {
+  const raw = document.getElementById('v-element_positions')?.value;
+  if(raw) positions = JSON.parse(raw);
+} catch(e) {}
+
+const g = id => document.getElementById(id);
+const setVal = (f,v) => { const e=g('v-'+f); if(e) e.value=v; };
+
+// ══ INIT ALL ELEMENTS ══
+function initElements(){
+  document.querySelectorAll('.builder-el').forEach(el => {
+    const id = el.id;
+    const pos = positions[id] || DEFAULTS[id] || {left:100,top:100,width:200,height:100,z:3};
+    applyPos(el, pos);
+    if(pos.fontSize) {
+      fontSizes[id] = pos.fontSize;
+      updateFontSizeDisplay(id, pos.fontSize);
+      const inner = el.querySelector('[style*="font-size"]');
+      if(inner) inner.style.fontSize = pos.fontSize + 'px';
+    }
+    setupDrag(el);
+    setupResize(el);
+  });
+  buildLayers();
+  setCanvasHeight();
+}
+
+function applyPos(el, pos){
+  el.style.left   = pos.left + 'px';
+  el.style.top    = pos.top  + 'px';
+  el.style.width  = pos.width  + 'px';
+  el.style.height = pos.height + 'px';
+  el.style.zIndex = pos.z || 3;
+}
+
+function getPos(el){
+  return {
+    left:   parseInt(el.style.left)   || 0,
+    top:    parseInt(el.style.top)    || 0,
+    width:  parseInt(el.style.width)  || 100,
+    height: parseInt(el.style.height) || 50,
+    z:      parseInt(el.style.zIndex) || 3,
+    fontSize: fontSizes[el.id] || null
+  };
+}
+
+function savePositions(){
+  const all = {};
+  document.querySelectorAll('.builder-el').forEach(el => {
+    all[el.id] = getPos(el);
+  });
+  setVal('element_positions', JSON.stringify(all));
+}
+
+// ══ DRAG ══
+function setupDrag(el){
+  el.addEventListener('mousedown', e => {
+    if(e.target.classList.contains('resize-handle')) return;
+    if(e.target.classList.contains('et-btn')) return;
+    if(e.target.classList.contains('fs-btn')) return;
+    if(e.target.isContentEditable) return;
+    e.preventDefault();
+    selectEl(el.id);
+    dragging = true;
+    const rect = el.getBoundingClientRect();
+    const scale = zoom / 100;
+    dragOffX = (e.clientX - rect.left) / scale;
+    dragOffY = (e.clientY - rect.top)  / scale;
+    document.body.style.cursor = 'grabbing';
+  });
+}
+
+// ══ RESIZE ══
+function setupResize(el){
+  el.querySelectorAll('.resize-handle').forEach(h => {
+    h.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      selectEl(el.id);
+      resizing = true;
+      resizeDir = [...h.classList].find(c => c.startsWith('rh-')).replace('rh-','');
+      resizeStartX = e.clientX;
+      resizeStartY = e.clientY;
+      resizeStartW = parseInt(el.style.width);
+      resizeStartH = parseInt(el.style.height);
+      resizeStartLeft = parseInt(el.style.left);
+      resizeStartTop  = parseInt(el.style.top);
+      document.body.style.cursor = h.style.cursor;
+    });
+  });
+}
+
+// ══ MOUSE EVENTS ══
+document.addEventListener('mousemove', e => {
+  const scale = zoom / 100;
+  if(dragging && selectedId){
+    const el = g(selectedId);
+    if(!el) return;
+    const canvas = g('site-canvas');
+    const cr = canvas.getBoundingClientRect();
+    const newLeft = (e.clientX - cr.left) / scale - dragOffX;
+    const newTop  = (e.clientY - cr.top)  / scale - dragOffY;
+    el.style.left = Math.max(0, newLeft) + 'px';
+    el.style.top  = Math.max(0, newTop)  + 'px';
+    updatePropsPanel();
+  }
+  if(resizing && selectedId){
+    const el = g(selectedId);
+    if(!el) return;
+    const dx = (e.clientX - resizeStartX) / scale;
+    const dy = (e.clientY - resizeStartY) / scale;
+    let nw = resizeStartW, nh = resizeStartH, nl = resizeStartLeft, nt = resizeStartTop;
+    if(resizeDir.includes('e')) nw = Math.max(40, resizeStartW + dx);
+    if(resizeDir.includes('s')) nh = Math.max(20, resizeStartH + dy);
+    if(resizeDir.includes('w')){ nw = Math.max(40, resizeStartW - dx); nl = resizeStartLeft + (resizeStartW - nw); }
+    if(resizeDir.includes('n')){ nh = Math.max(20, resizeStartH - dy); nt = resizeStartTop  + (resizeStartH - nh); }
+    el.style.width  = nw + 'px';
+    el.style.height = nh + 'px';
+    el.style.left   = nl + 'px';
+    el.style.top    = nt + 'px';
+    updatePropsPanel();
+    setCanvasHeight();
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  if(dragging || resizing){
+    dragging = false; resizing = false;
+    document.body.style.cursor = '';
+    savePositions();
+    setCanvasHeight();
+  }
+});
+
+// ══ SELECT ══
+function selectEl(id){
+  deselectAll();
+  selectedId = id;
+  const el = g(id);
+  if(el) el.classList.add('selected');
+  updateLayers();
+  updatePropsPanel();
+}
+
+function deselectAll(){
+  document.querySelectorAll('.builder-el').forEach(el => el.classList.remove('selected'));
+  selectedId = null;
+  updatePropsPanel();
+  updateLayers();
+}
+
+// Click canvas background = deselect
+g('site-canvas').addEventListener('mousedown', e => {
+  if(e.target === g('site-canvas') || e.target === g('grid-overlay')){
+    deselectAll();
+  }
+});
+
+// ══ INLINE EDIT ══
+function inlineEdit(e, elId, field){
+  e.stopPropagation();
+  const innerMap = {
+    'el-logo': 'el-logo-txt', 'el-hero-text': 'el-hero-text-txt',
+    'el-hero-btn': 'el-hero-btn-txt', 'el-section-title': 'el-section-title-txt',
+    'el-footer-txt': 'el-footer-txt-content', 'el-count': 'el-count-txt'
+  };
+  const inner = g(innerMap[elId]) || e.target;
+  inner.contentEditable = 'true';
+  inner.focus();
+  selectAll(inner);
+  inner.addEventListener('blur', () => {
+    inner.contentEditable = 'false';
+    setVal(field, inner.textContent.trim());
+    toast('✅ Texte mis à jour !');
+  }, {once:true});
+  inner.addEventListener('keydown', ev => {
+    if(ev.key==='Enter'&&!ev.shiftKey){ ev.preventDefault(); inner.blur(); }
+    if(ev.key==='Escape') { inner.contentEditable='false'; }
+  });
+}
+
+function selectAll(el){
+  const r = document.createRange(); r.selectNodeContents(el);
+  const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+
+// ══ FONT SIZE ══
+function changeFontSize(elId, delta){
+  const innerMap = {
+    'el-logo': 'el-logo-txt', 'el-nav-links': null,
+    'el-hero-text': 'el-hero-text-txt', 'el-hero-btn': 'el-hero-btn-txt',
+    'el-section-title': 'el-section-title-txt', 'el-count': 'el-count-txt',
+    'el-footer-txt': 'el-footer-txt-content'
+  };
+  const cur = fontSizes[elId] || parseInt(g('fs-'+elId)?.textContent) || 16;
+  const nv = Math.max(8, Math.min(80, cur + delta));
+  fontSizes[elId] = nv;
+  updateFontSizeDisplay(elId, nv);
+
+  if(elId === 'el-nav-links'){
+    g('el-nav-links').querySelectorAll('.el-nav-link').forEach(l => l.style.fontSize = nv+'px');
+  } else {
+    const innerKey = innerMap[elId];
+    if(innerKey){ const el=g(innerKey); if(el) el.style.fontSize = nv+'px'; }
+  }
+  savePositions();
+  updatePropsPanel();
+}
+
+function updateFontSizeDisplay(elId, v){
+  const el = g('fs-'+elId); if(el) el.textContent = v+'px';
+}
+
+// ══ Z-ORDER ══
+function bringFwd(id){ const el=g(id); if(el){ const z=parseInt(el.style.zIndex)||3; el.style.zIndex=z+1; savePositions(); } }
+function sendBck(id){ const el=g(id); if(el){ const z=parseInt(el.style.zIndex)||3; el.style.zIndex=Math.max(1,z-1); savePositions(); } }
+function deleteEl(id){ const el=g(id); if(el){ el.remove(); buildLayers(); savePositions(); } }
+
+// ══ ADD ELEMENT ══
+let addCount = 0;
+function addEl(type){
+  addCount++;
+  const id = 'el-custom-'+addCount;
+  const div = document.createElement('div');
+  div.className = 'builder-el';
+  div.id = id;
+  div.dataset.label = type === 'text' ? '📝 Texte' : type === 'btn' ? '🔵 Bouton' : type === 'card' ? '🃏 Carte' : '➖ Séparateur';
+  div.dataset.type = type;
+  div.style.left = '200px'; div.style.top = '500px';
+  div.style.width = type==='text'?'300px': type==='btn'?'150px': type==='card'?'300px':'600px';
+  div.style.height = type==='text'?'40px': type==='btn'?'44px': type==='card'?'160px':'4px';
+  div.style.zIndex = '20';
+
+  const inner = type==='text' ? '<div contenteditable="true" style="font-size:18px;font-weight:700;color:#1E3A5F;padding:4px;">Nouveau texte</div>'
+    : type==='btn' ? '<div style="background:#1E3A5F;color:white;padding:9px 20px;border-radius:7px;font-weight:600;font-size:14px;display:inline-block;cursor:pointer;">Bouton</div>'
+    : type==='card' ? '<div style="background:white;border:1px solid #e8f0fe;border-radius:12px;padding:18px;box-shadow:0 4px 20px rgba(0,0,0,.06);height:100%;box-sizing:border-box;"><div style="background:#dbeafe;color:#1e40af;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-block;margin-bottom:8px;">Badge</div><div style="font-size:14px;font-weight:700;color:#1E3A5F;margin-bottom:6px;">Titre de la carte</div><div style="font-size:12px;color:#6b7280;">Description courte</div></div>'
+    : '<div style="background:#1E3A5F;height:3px;border-radius:2px;width:100%;"></div>';
+
+  div.innerHTML = `<div class="el-outline"></div>
+    <div class="el-toolbar"><span style="color:var(--muted);font-size:.6rem;padding:2px 4px;">${div.dataset.label}</span><button class="et-btn danger" onclick="deleteEl('${id}')">🗑️</button></div>
+    <div class="resize-handle rh-e"></div><div class="resize-handle rh-s"></div><div class="resize-handle rh-se"></div><div class="resize-handle rh-w"></div>
+    ${inner}`;
+
+  g('site-canvas').appendChild(div);
+  setupDrag(div); setupResize(div);
+  selectEl(id); buildLayers();
+  toast('✅ Élément ajouté !');
+}
+
+// ══ LAYERS ══
+function buildLayers(){
+  const list = g('layers-list');
+  list.innerHTML = '';
+  document.querySelectorAll('.builder-el').forEach(el => {
+    const item = document.createElement('div');
+    item.className = 'layer-item' + (el.id === selectedId ? ' selected' : '');
+    item.innerHTML = `<span class="layer-icon">${getIcon(el.dataset.type)}</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${el.dataset.label||el.id}</span><span class="layer-vis" onclick="toggleVis('${el.id}',event)">👁️</span>`;
+    item.onclick = () => selectEl(el.id);
+    list.appendChild(item);
+  });
+}
+
+function getIcon(type){ return {text:'📝',btn:'🔵','navbar-bg':'🎨','hero-bg':'🖼️','hero-overlay':'⬛',nav:'🔗',card:'🃏','footer-bg':'🦶',divider:'➖'}[type]||'📦'; }
+
+function updateLayers(){ document.querySelectorAll('.layer-item').forEach((li,i)=>{ const els=[...document.querySelectorAll('.builder-el')]; if(els[i]) li.classList.toggle('selected',els[i].id===selectedId); }); }
+
+function toggleVis(id, e){
+  e.stopPropagation();
+  const el = g(id);
+  if(!el) return;
+  el.style.opacity = el.style.opacity === '0' ? '1' : '0';
+  el.style.pointerEvents = el.style.opacity === '0' ? 'none' : 'all';
+}
+
+// ══ PROPS PANEL ══
+function updatePropsPanel(){
+  const panel = g('props-panel');
+  const title = g('right-title');
+  if(!selectedId){ panel.innerHTML='<div class="no-sel">👆 Clique sur un élément pour voir ses propriétés</div>'; title.textContent='📐 Propriétés'; return; }
+  const el = g(selectedId);
+  if(!el) return;
+  title.textContent = el.dataset.label || selectedId;
+  const pos = getPos(el);
+  panel.innerHTML = `
+    <div class="prop-section">
+      <div class="prop-label">📐 Position & Taille</div>
+      <div class="pos-grid">
+        <div class="pos-field"><label>X (px)</label><input type="number" value="${pos.left}" oninput="setProp('left',this.value)"></div>
+        <div class="pos-field"><label>Y (px)</label><input type="number" value="${pos.top}" oninput="setProp('top',this.value)"></div>
+        <div class="pos-field"><label>Largeur</label><input type="number" value="${pos.width}" oninput="setProp('width',this.value)"></div>
+        <div class="pos-field"><label>Hauteur</label><input type="number" value="${pos.height}" oninput="setProp('height',this.value)"></div>
+        <div class="pos-field"><label>Z-index</label><input type="number" value="${pos.z}" oninput="setProp('z',this.value)"></div>
+        ${fontSizes[selectedId]?`<div class="pos-field"><label>Police</label><input type="number" value="${fontSizes[selectedId]||16}" oninput="changeFontSizeDirect(this.value)"></div>`:''}
+      </div>
+    </div>
+    <div class="prop-section">
+      <div class="prop-label">🎨 Couleur de fond</div>
+      <div class="prop-color-row">
+        <label>Fond</label>
+        <div class="prop-swatch" id="prop-swatch" style="background:${getBgColor(el)};"><input type="color" value="${getBgColor(el)}" oninput="setBgColor(this.value)"></div>
+        <input class="prop-hex" type="text" value="${getBgColor(el)}" oninput="if(/^#[0-9A-Fa-f]{6}$/.test(this.value))setBgColor(this.value)">
+      </div>
+    </div>
+    <div class="prop-section">
+      <div class="prop-label">⚡ Actions</div>
+      <button type="button" class="prop-action-btn" onclick="bringFwd('${selectedId}')">⬆️ Mettre au premier plan</button>
+      <button type="button" class="prop-action-btn" onclick="sendBck('${selectedId}')">⬇️ Mettre en arrière plan</button>
+      <button type="button" class="prop-action-btn" onclick="duplicateEl('${selectedId}')">📋 Dupliquer</button>
+      <button type="button" class="prop-action-btn danger" onclick="deleteEl('${selectedId}')">🗑️ Supprimer</button>
+    </div>
+  `;
+}
+
+function setProp(prop, val){
+  if(!selectedId) return;
+  const el = g(selectedId);
+  const num = parseInt(val);
+  if(isNaN(num)) return;
+  if(prop==='z') el.style.zIndex = num;
+  else el.style[prop] = num+'px';
+  savePositions();
+  if(prop==='height') setCanvasHeight();
+}
+
+function changeFontSizeDirect(val){
+  if(!selectedId) return;
+  changeFontSize(selectedId, parseInt(val) - (fontSizes[selectedId]||16));
+}
+
+function getBgColor(el){
+  const inner = el.querySelector('[style*="background"]');
+  if(!inner) return '#ffffff';
+  const m = inner.style.background.match(/#[0-9a-fA-F]{6}/);
+  return m ? m[0] : '#ffffff';
+}
+
+function setBgColor(color){
+  if(!selectedId) return;
+  const el = g(selectedId);
+  const bg = el.querySelector('[style*="background"]') || el.querySelector('div');
+  if(bg){ bg.style.background = color; }
+  const sw = g('prop-swatch'); if(sw) sw.style.background = color;
+}
+
+function duplicateEl(id){
+  const el = g(id);
+  if(!el) return;
+  const clone = el.cloneNode(true);
+  addCount++;
+  clone.id = 'el-custom-'+addCount;
+  clone.style.left = (parseInt(el.style.left)+20)+'px';
+  clone.style.top  = (parseInt(el.style.top)+20)+'px';
+  g('site-canvas').appendChild(clone);
+  setupDrag(clone); setupResize(clone);
+  selectEl(clone.id); buildLayers();
+  toast('📋 Élément dupliqué !');
+}
+
+// ══ ZOOM ══
+function setZoom(v){
+  zoom = Math.min(150, Math.max(30, v));
+  g('zoom-display').textContent = zoom+'%';
+  g('site-canvas').style.transform = 'scale('+zoom/100+')';
+  g('canvas-viewport').querySelector('div').style.width = (canvasW * zoom/100 + 60) + 'px';
+}
+function zoomBy(d){ setZoom(zoom+d); }
+
+// Mouse wheel zoom
+g('canvas-viewport').addEventListener('wheel', e => {
+  if(e.ctrlKey || e.metaKey){ e.preventDefault(); zoomBy(e.deltaY > 0 ? -10 : 10); }
+}, {passive:false});
+
+// ══ DEVICE ══
+function setDev(w, btn){
+  canvasW = w;
+  document.querySelectorAll('.tbar-btn[id^="dev-"]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  g('site-canvas').style.width = w+'px';
+  ['el-navbar-bg','el-hero-bg','el-footer-bg'].forEach(id=>{
+    const el=g(id); if(el) el.style.width = w+'px';
+  });
+  setZoom(zoom);
+}
+
+// ══ GRID ══
+function toggleGrid(){
+  gridOn = !gridOn;
+  g('grid-overlay').classList.toggle('show', gridOn);
+  g('grid-btn').classList.toggle('active', gridOn);
+}
+
+// ══ CANVAS HEIGHT ══
+function setCanvasHeight(){
+  let maxBottom = 800;
+  document.querySelectorAll('.builder-el').forEach(el => {
+    const b = parseInt(el.style.top) + parseInt(el.style.height);
+    if(b > maxBottom) maxBottom = b;
+  });
+  g('site-canvas').style.minHeight = (maxBottom + 60) + 'px';
+}
+
+// ══ RESET ══
+function resetPositions(){
+  if(!confirm('Remettre tous les éléments à leur position par défaut ?')) return;
+  document.querySelectorAll('.builder-el').forEach(el => {
+    const def = DEFAULTS[el.id];
+    if(def) applyPos(el, def);
+  });
+  savePositions();
+  setCanvasHeight();
+  toast('🔄 Positions réinitialisées');
+}
+
+// ══ TOAST ══
+function toast(msg){
+  let t = g('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; t.className='toast'; document.body.appendChild(t); }
+  t.textContent=msg; t.style.display='block';
+  clearTimeout(t._t); t._t=setTimeout(()=>{ t.style.display='none'; },2800);
+}
+
+// ══ KEYBOARD SHORTCUTS ══
+document.addEventListener('keydown', e => {
+  if(!selectedId) return;
+  if(e.target.isContentEditable) return;
+  const el = g(selectedId); if(!el) return;
+  const step = e.shiftKey ? 10 : 1;
+  if(e.key==='ArrowLeft')  { el.style.left  = (parseInt(el.style.left) -step)+'px'; e.preventDefault(); }
+  if(e.key==='ArrowRight') { el.style.left  = (parseInt(el.style.left) +step)+'px'; e.preventDefault(); }
+  if(e.key==='ArrowUp')    { el.style.top   = (parseInt(el.style.top)  -step)+'px'; e.preventDefault(); }
+  if(e.key==='ArrowDown')  { el.style.top   = (parseInt(el.style.top)  +step)+'px'; e.preventDefault(); }
+  if(e.key==='Delete'||e.key==='Backspace'){ if(!e.target.tagName.match(/INPUT|TEXTAREA/)) deleteEl(selectedId); }
+  savePositions();
+  updatePropsPanel();
+});
+
+// ══ INIT ══
+setTimeout(() => {
+  initElements();
+  setZoom(85);
+  const t = g('toast');
+  if(t&&t.style.display==='block') setTimeout(()=>{ t.style.display='none'; },3500);
+}, 100);
+</script>
+{% endblock %}
